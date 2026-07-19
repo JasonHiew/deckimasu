@@ -378,8 +378,9 @@ export const TranslatedTextOverlay: VFC<{
     allowLabelGrowth: boolean,
     translatedTextAlignment: HorizontalTextAlignment,
     translatedTextFontFamily: string,
-    translatedTextFontStyle: FontStyleOption
-}> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle }) => {
+    translatedTextFontStyle: FontStyleOption,
+    onSendToPhone: () => void
+}> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle, onSendToPhone }) => {
     // Composition layer is handled by CompositionRequest below -- only mounted when visible
 
     // Ref to the screenshot image element
@@ -708,6 +709,40 @@ export const TranslatedTextOverlay: VFC<{
                             </svg>
                         </div>
                     )}
+
+                    {/* Send-to-phone button - click/tap to push the current text via ntfy */}
+                    {!loading && regions.length > 0 && (
+                        <div
+                            onClick={onSendToPhone}
+                            style={{
+                                position: "absolute",
+                                bottom: "20px",
+                                right: "20px",
+                                background: "rgba(0, 0, 0, 0.7)",
+                                padding: '10px',
+                                borderRadius: '50%',
+                                zIndex: 7003,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                            }}>
+                            <svg
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#4caf50"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                {/* Paper plane / send icon */}
+                                <path d="M22 2 11 13" />
+                                <path d="M22 2 15 22 11 13 2 9 22 2Z" />
+                            </svg>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -776,7 +811,7 @@ export const TranslatedTextOverlay: VFC<{
 
 
 // Main image overlay component
-export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void }> = ({ state, onDismiss }) => {
+export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSendToPhone: () => void }> = ({ state, onDismiss, onSendToPhone }) => {
     const [visible, setVisible] = useState<boolean>(false);
     const [imageData, setImageData] = useState<string>("");
     const [regions, setRegions] = useState<TranslatedRegion[]>([]);
@@ -852,6 +887,7 @@ export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void }> = (
             translatedTextAlignment={translatedTextAlignment}
             translatedTextFontFamily={translatedTextFontFamily}
             translatedTextFontStyle={translatedTextFontStyle}
+            onSendToPhone={onSendToPhone}
         />
     );
 };

@@ -6,13 +6,77 @@ import {
     DropdownItem,
     ToggleField,
     SliderField,
-    Field
+    Field,
+    ButtonItem,
+    TextField,
+    Focusable,
+    DialogButton,
+    ModalRoot,
+    showModal
 } from "@decky/ui";
 
 import { VFC, useState } from "react";
 import { useSettings } from "../SettingsContext";
 import { InputMode } from "../Input";
 import { useFontOptions, isRemoteFont, loadRemoteFont } from "../fonts";
+
+// ntfy settings modal - edits server URL, topic, and access token together
+const NtfySettingsModal: VFC<{
+    currentServerUrl: string;
+    currentTopic: string;
+    currentToken: string;
+    onSave: (serverUrl: string, topic: string, token: string) => void;
+    closeModal?: () => void;
+}> = ({ currentServerUrl, currentTopic, currentToken, onSave, closeModal }) => {
+    const [serverUrl, setServerUrl] = useState(currentServerUrl || "");
+    const [topic, setTopic] = useState(currentTopic || "");
+    const [token, setToken] = useState(currentToken || "");
+
+    return (
+        <ModalRoot onCancel={closeModal} onEscKeypress={closeModal}>
+            <div style={{ padding: "20px", minWidth: "400px" }}>
+                <h2 style={{ marginBottom: "15px" }}>Notifications (ntfy)</h2>
+                <p style={{ marginBottom: "15px", color: "#aaa", fontSize: "13px" }}>
+                    Recognized text is sent to this ntfy topic so it shows up on your phone.
+                </p>
+                <TextField
+                    label="Server URL"
+                    value={serverUrl}
+                    bShowClearAction={true}
+                    onChange={(e) => setServerUrl(e.target.value)}
+                />
+                <TextField
+                    label="Topic"
+                    value={topic}
+                    bShowClearAction={true}
+                    onChange={(e) => setTopic(e.target.value)}
+                />
+                <TextField
+                    label="Access Token (optional)"
+                    value={token}
+                    bIsPassword={true}
+                    bShowClearAction={true}
+                    onChange={(e) => setToken(e.target.value)}
+                />
+                <Focusable
+                    style={{ display: "flex", gap: "10px", marginTop: "20px", justifyContent: "flex-end" }}
+                >
+                    <DialogButton onClick={closeModal}>
+                        Cancel
+                    </DialogButton>
+                    <DialogButton
+                        onClick={() => {
+                            onSave(serverUrl.trim(), topic.trim(), token.trim());
+                            closeModal?.();
+                        }}
+                    >
+                        Save
+                    </DialogButton>
+                </Focusable>
+            </div>
+        </ModalRoot>
+    );
+};
 
 // Input mode options for dropdown
 const inputModeOptions = [
@@ -258,6 +322,43 @@ export const TabControls: VFC<TabControlsProps> = ({ inputDiagnostics }) => {
                             updateSetting('allowLabelGrowth', value, 'Allow label growth');
                         }}
                     />
+                </PanelSectionRow>
+            </PanelSection>
+
+            <PanelSection title="Notifications (ntfy)">
+                <PanelSectionRow>
+                    <Field
+                        label="ntfy Topic"
+                        description="Send recognized text to your phone via ntfy"
+                        icon={
+                            <div style={{
+                                width: "10px",
+                                height: "10px",
+                                borderRadius: "50%",
+                                backgroundColor: (settings.ntfyServerUrl && settings.ntfyTopic) ? "#4caf50" : "#ff6b6b"
+                            }} />
+                        }
+                    >
+                        <ButtonItem
+                            layout="below"
+                            onClick={() => {
+                                showModal(
+                                    <NtfySettingsModal
+                                        currentServerUrl={settings.ntfyServerUrl}
+                                        currentTopic={settings.ntfyTopic}
+                                        currentToken={settings.ntfyToken}
+                                        onSave={(serverUrl, topic, token) => {
+                                            updateSetting('ntfyServerUrl', serverUrl, 'ntfy Server URL');
+                                            updateSetting('ntfyTopic', topic, 'ntfy Topic');
+                                            updateSetting('ntfyToken', token, 'ntfy Access Token');
+                                        }}
+                                    />
+                                );
+                            }}
+                        >
+                            Configure ntfy
+                        </ButtonItem>
+                    </Field>
                 </PanelSectionRow>
             </PanelSection>
 

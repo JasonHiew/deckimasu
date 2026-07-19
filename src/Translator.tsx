@@ -3,10 +3,16 @@
 import { call, toaster } from "@decky/api";
 import { Router } from "@decky/ui";
 import { TextRecognizer, NetworkError, ApiKeyError, RateLimitError, ModelNotAvailableError } from "./TextRecognizer";
-import { TextTranslator } from "./TextTranslator";
+import { TextTranslator, TranslatedRegion } from "./TextTranslator";
 import { Input, InputMode, ActionType, ProgressInfo } from "./Input";
 import { ImageState } from "./Overlay";
 import { logger } from "./Logger";
+
+interface NtfyResult {
+    success: boolean;
+    error?: string;
+    message?: string;
+}
 
 // Screenshot response interface
 export interface ScreenshotResponse {
@@ -27,6 +33,8 @@ export class GameTranslatorLogic {
     private pauseGameOnOverlay: boolean = false;
     private hideIdenticalTranslations: boolean = false;
     private currentRunId: number = 0;
+    private lastRegions: TranslatedRegion[] = [];
+    private sendingToPhone: boolean = false;
 
     // Provider settings for upfront validation
     private ocrProvider: string = "rapidocr";
@@ -312,6 +320,36 @@ export class GameTranslatorLogic {
         }
     }
 
+    // Sends the currently displayed regions (translated text, falling back to
+    // original text) to the phone via ntfy, in the same reading order they're shown.
+    sendToPhone = async (): Promise<void> => {
+        if (this.sendingToPhone) return;
+        if (this.lastRegions.length === 0) {
+            this.notify("Nothing to send", 2000);
+            return;
+        }
+
+        this.sendingToPhone = true;
+        try {
+            const text = this.lastRegions
+                .map(r => r.translatedText || r.text)
+                .join("\n");
+
+            const result = await call<[string], NtfyResult>('send_ntfy_notification', text);
+
+            if (result && result.success) {
+                this.notify("Sent to phone", 1500);
+            } else {
+                this.notify("Failed to send", 2500, result?.message || "Check your ntfy settings");
+            }
+        } catch (error) {
+            logger.error('Translator', 'Failed to send to phone', error);
+            this.notify("Failed to send", 2500, "Check your ntfy settings");
+        } finally {
+            this.sendingToPhone = false;
+        }
+    }
+
     takeScreenshotAndTranslate = async (): Promise<void> => {
         // If already processing or disabled, return
         if (this.isProcessing || !this.enabled) {
@@ -383,6 +421,7 @@ export class GameTranslatorLogic {
                     }
                 }
 
+                this.lastRegions = translatedRegions;
                 this.imageState.showTranslatedImage(result.base64, translatedRegions);
             } else {
                 // No text found, show message

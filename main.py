@@ -92,6 +92,7 @@ import requests
 # Import provider system
 from providers import ProviderManager, TextRegion, NetworkError, ApiKeyError, RateLimitError
 from providers.translation_cache import TranslationCache, PROVIDER_TIERS, normalize
+from providers.ntfy_provider import NtfyProvider
 
 _processing_lock = False
 
@@ -100,6 +101,7 @@ SENSITIVE_SETTING_KEYS = {
     "google_vision_api_key",
     "google_translate_api_key",
     "gemini_api_key",
+    "ntfy_token",
 }
 
 
@@ -1201,7 +1203,7 @@ class Plugin:
     def _load_session_env(self):
         # plugin_loader.service starts at boot with no graphical env
         uid = os.getuid()
-        desktop_comms = {'plasmashell', 'kwin_wayland', 'kwin_x11', 'gnome-shell', 'sway', 'Hyprland'}
+        desktop_comms = {'plasmashell', 'kwin_wayland', 'kwin_x11', 'gnome-shell', 'sway', 'Hyprland', 'gamescope'}
         for proc_path in glob.glob('/proc/[0-9]*'):
             try:
                 if os.stat(proc_path).st_uid != uid:
@@ -1488,6 +1490,12 @@ class Plugin:
                         self._provider_manager.resume_ct2_worker()
             elif key == "translation_cache_enabled":
                 self._translation_cache_enabled = bool(value)
+            elif key == "ntfy_server_url":
+                pass  # persisted below, read fresh in send_ntfy_notification
+            elif key == "ntfy_topic":
+                pass  # persisted below, read fresh in send_ntfy_notification
+            elif key == "ntfy_token":
+                pass  # persisted below, read fresh in send_ntfy_notification
             else:
                 logger.warning(f"Unknown setting key: {key}")
 
@@ -1533,6 +1541,9 @@ class Plugin:
                 "allow_label_growth": self._settings.get_setting("allow_label_growth", False),
                 "custom_recognition_settings": self._settings.get_setting("custom_recognition_settings", False),
                 "translation_cache_enabled": self._translation_cache_enabled,
+                "ntfy_server_url": self._settings.get_setting("ntfy_server_url", ""),
+                "ntfy_topic": self._settings.get_setting("ntfy_topic", ""),
+                "ntfy_token": self._settings.get_setting("ntfy_token", ""),
             }
             return settings
         except Exception as e:
@@ -2341,6 +2352,29 @@ class Plugin:
             logger.error(f"Translation error: {e}")
             logger.error(traceback.format_exc())
             return None
+
+    async def send_ntfy_notification(self, text: str):
+        try:
+            provider = NtfyProvider(
+                server_url=self._settings.get_setting("ntfy_server_url", ""),
+                topic=self._settings.get_setting("ntfy_topic", ""),
+                token=self._settings.get_setting("ntfy_token", ""),
+            )
+            await asyncio.to_thread(provider.send, text)
+            return {"success": True}
+        except NetworkError as e:
+            logger.error(f"Network error sending ntfy notification: {e}")
+            return {"success": False, "error": "network_error", "message": str(e)}
+        except ApiKeyError as e:
+            logger.error(f"ntfy configuration error: {e}")
+            return {"success": False, "error": "api_key_error", "message": str(e)}
+        except RateLimitError as e:
+            logger.error(f"ntfy rate limit: {e}")
+            return {"success": False, "error": "rate_limit_error", "message": str(e)}
+        except Exception as e:
+            logger.error(f"ntfy send error: {e}")
+            logger.error(traceback.format_exc())
+            return {"success": False, "error": "unknown_error", "message": str(e)}
 
     async def get_enabled_state(self):
         return await self.get_setting("enabled", True)

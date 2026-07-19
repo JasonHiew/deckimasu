@@ -327,7 +327,7 @@ export default definePlugin(() => {
 
     // Add image overlay as a global component
     routerHook.addGlobalComponent("ImageOverlay", () => (
-        <ImageOverlay state={imageState} onDismiss={logic.dismiss}/>
+        <ImageOverlay state={imageState} onDismiss={logic.dismiss} onSendToPhone={logic.sendToPhone}/>
     ));
 
     // Add activation indicator as a global component

@@ -39,6 +39,9 @@ export interface Settings {
     allowLabelGrowth: boolean;
     customRecognitionSettings: boolean;
     translationCacheEnabled: boolean;
+    ntfyServerUrl: string; // ntfy server URL (e.g. https://ntfy.example.com)
+    ntfyTopic: string; // ntfy topic name
+    ntfyToken: string; // ntfy access token, if the topic requires auth
 }
 
 // Define action types
@@ -81,6 +84,9 @@ const initialSettings: Settings = {
     allowLabelGrowth: false,
     customRecognitionSettings: false,
     translationCacheEnabled: true,
+    ntfyServerUrl: "",
+    ntfyTopic: "",
+    ntfyToken: "",
 };
 
 // Create the reducer
@@ -158,6 +164,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                     allowLabelGrowth: serverSettings.allow_label_growth ?? false,
                     customRecognitionSettings: serverSettings.custom_recognition_settings ?? false,
                     translationCacheEnabled: serverSettings.translation_cache_enabled ?? true,
+                    ntfyServerUrl: serverSettings.ntfy_server_url || "",
+                    ntfyTopic: serverSettings.ntfy_topic || "",
+                    ntfyToken: serverSettings.ntfy_token || "",
                 };
 
                 // Update settings in context
@@ -240,7 +249,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                 hideIdenticalTranslations: 'hide_identical_translations',
                 allowLabelGrowth: 'allow_label_growth',
                 customRecognitionSettings: 'custom_recognition_settings',
-                translationCacheEnabled: 'translation_cache_enabled'
+                translationCacheEnabled: 'translation_cache_enabled',
+                ntfyServerUrl: 'ntfy_server_url',
+                ntfyTopic: 'ntfy_topic',
+                ntfyToken: 'ntfy_token'
             };
 
             // Skip settings that don't need to be saved to backend
