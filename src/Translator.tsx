@@ -323,18 +323,28 @@ export class GameTranslatorLogic {
     // Sends the currently displayed regions (translated text, falling back to
     // original text) to the phone via ntfy, in the same reading order they're shown.
     sendToPhone = async (): Promise<void> => {
-        if (this.sendingToPhone) return;
         if (this.lastRegions.length === 0) {
             this.notify("Nothing to send", 2000);
             return;
         }
 
+        const text = this.lastRegions
+            .map(r => r.translatedText || r.text)
+            .join("\n");
+
+        await this.sendTextToPhone(text);
+    }
+
+    // Sends a single region's original (untranslated) text to the phone via ntfy.
+    sendRegionToPhone = async (text: string): Promise<void> => {
+        await this.sendTextToPhone(text);
+    }
+
+    private sendTextToPhone = async (text: string): Promise<void> => {
+        if (this.sendingToPhone) return;
+
         this.sendingToPhone = true;
         try {
-            const text = this.lastRegions
-                .map(r => r.translatedText || r.text)
-                .join("\n");
-
             const result = await call<[string], NtfyResult>('send_ntfy_notification', text);
 
             if (result && result.success) {

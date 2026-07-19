@@ -379,8 +379,9 @@ export const TranslatedTextOverlay: VFC<{
     translatedTextAlignment: HorizontalTextAlignment,
     translatedTextFontFamily: string,
     translatedTextFontStyle: FontStyleOption,
-    onSendToPhone: () => void
-}> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle, onSendToPhone }) => {
+    onSendToPhone: () => void,
+    onSendRegion: (text: string) => void
+}> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle, onSendToPhone, onSendRegion }) => {
     // Composition layer is handled by CompositionRequest below -- only mounted when visible
 
     // Ref to the screenshot image element
@@ -391,6 +392,9 @@ export const TranslatedTextOverlay: VFC<{
 
     // State to track the natural (original) image dimensions from the screenshot
     const [naturalDimensions, setNaturalDimensions] = useState({ width: 1280, height: 800 });
+
+    // Whether boxes show the original recognized text instead of the translation
+    const [showOriginalText, setShowOriginalText] = useState(false);
 
     // Load font as a side-effect (network request / DOM injection)
     useEffect(() => {
@@ -486,7 +490,7 @@ export const TranslatedTextOverlay: VFC<{
 
     return (
         <>
-        {visible && <CompositionRequest level={UIComposition.Notification} />}
+        {visible && <CompositionRequest level={UIComposition.Overlay} />}
         <div id='translation-overlay'
              style={{
                  height: "100vh",
@@ -572,7 +576,7 @@ export const TranslatedTextOverlay: VFC<{
 
                         return regions.map((region, index) => {
                             const fontSize = calculateFontSize(region, generalFactor, fontScale);
-                            let displayText = region.translatedText || region.text;
+                            let displayText = showOriginalText ? region.text : (region.translatedText || region.text);
 
                             // Redistribute text to fill original block height, minimising width
                             if (allowLabelGrowth) {
@@ -634,6 +638,8 @@ export const TranslatedTextOverlay: VFC<{
                             return (
                                 <div
                                     key={index}
+                                    onClick={() => onSendRegion(region.text)}
+                                    title="Send this text to phone"
                                     style={{
                                         position: "absolute",
                                         display: 'flex',
@@ -661,6 +667,7 @@ export const TranslatedTextOverlay: VFC<{
 
                                         wordWrap: "break-word",
                                         whiteSpace: "pre-wrap",
+                                        cursor: 'pointer',
 
                                         animation: "fadeInTranslation 0.2s ease-out forwards"
                                     }}
@@ -743,6 +750,30 @@ export const TranslatedTextOverlay: VFC<{
                             </svg>
                         </div>
                     )}
+
+                    {/* Original/translated toggle - click/tap to swap what the boxes display */}
+                    {!loading && regions.length > 0 && (
+                        <div
+                            onClick={() => setShowOriginalText(v => !v)}
+                            style={{
+                                position: "absolute",
+                                top: "20px",
+                                right: "20px",
+                                background: "rgba(0, 0, 0, 0.7)",
+                                padding: '6px 12px',
+                                borderRadius: '14px',
+                                zIndex: 7003,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                color: '#ffffff',
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                            }}>
+                            {showOriginalText ? "Show Translation" : "Show Original"}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -811,7 +842,7 @@ export const TranslatedTextOverlay: VFC<{
 
 
 // Main image overlay component
-export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSendToPhone: () => void }> = ({ state, onDismiss, onSendToPhone }) => {
+export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSendToPhone: () => void, onSendRegion: (text: string) => void }> = ({ state, onDismiss, onSendToPhone, onSendRegion }) => {
     const [visible, setVisible] = useState<boolean>(false);
     const [imageData, setImageData] = useState<string>("");
     const [regions, setRegions] = useState<TranslatedRegion[]>([]);
@@ -888,6 +919,7 @@ export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSen
             translatedTextFontFamily={translatedTextFontFamily}
             translatedTextFontStyle={translatedTextFontStyle}
             onSendToPhone={onSendToPhone}
+            onSendRegion={onSendRegion}
         />
     );
 };
