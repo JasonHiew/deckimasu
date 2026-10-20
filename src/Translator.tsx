@@ -3,7 +3,7 @@
 import { call, toaster } from "@decky/api";
 import { Router } from "@decky/ui";
 import { TextRecognizer, NetworkError, ApiKeyError, RateLimitError, ModelNotAvailableError } from "./TextRecognizer";
-import { TextTranslator, TranslatedRegion } from "./TextTranslator";
+import { TextTranslator } from "./TextTranslator";
 import { Input, InputMode, ActionType, ProgressInfo } from "./Input";
 import { ImageState } from "./Overlay";
 import { logger } from "./Logger";
@@ -33,7 +33,6 @@ export class GameTranslatorLogic {
     private pauseGameOnOverlay: boolean = false;
     private hideIdenticalTranslations: boolean = false;
     private currentRunId: number = 0;
-    private lastRegions: TranslatedRegion[] = [];
     private sendingToPhone: boolean = false;
 
     // Provider settings for upfront validation
@@ -330,21 +329,6 @@ export class GameTranslatorLogic {
         }
     }
 
-    // Sends the currently displayed regions (translated text, falling back to
-    // original text) to the phone via ntfy, in the same reading order they're shown.
-    sendToPhone = async (): Promise<void> => {
-        if (this.lastRegions.length === 0) {
-            this.notify("Nothing to send", 2000);
-            return;
-        }
-
-        const text = this.lastRegions
-            .map(r => r.translatedText || r.text)
-            .join("\n");
-
-        await this.sendTextToPhone(text);
-    }
-
     // Sends a single region's original (untranslated) text to the phone via ntfy.
     sendRegionToPhone = async (text: string): Promise<void> => {
         await this.sendTextToPhone(text);
@@ -447,7 +431,6 @@ export class GameTranslatorLogic {
                     }
                 }
 
-                this.lastRegions = translatedRegions;
                 this.imageState.showTranslatedImage(result.base64, translatedRegions);
             } else {
                 // No text found, show message

@@ -481,11 +481,10 @@ export const TranslatedTextOverlay: VFC<{
     translatedTextAlignment: HorizontalTextAlignment,
     translatedTextFontFamily: string,
     translatedTextFontStyle: FontStyleOption,
-    onSendToPhone: () => void,
     onSendRegion: (text: string) => void,
     onSendWord: (word: string) => void,
     navSource?: ImageState
-}> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle, onSendToPhone, onSendRegion, onSendWord, navSource }) => {
+}> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle, onSendRegion, onSendWord, navSource }) => {
     // Composition layer is handled by CompositionRequest below -- only mounted when visible
 
     // Ref to the screenshot image element
@@ -654,6 +653,10 @@ export const TranslatedTextOverlay: VFC<{
         }
         if (!translationsVisible || regions.length === 0) return;
         switch (button) {
+            case 'l1':
+            case 'r1':
+                setShowOriginalText(v => !v);
+                break;
             case 'up':
             case 'down':
             case 'left':
@@ -916,40 +919,6 @@ export const TranslatedTextOverlay: VFC<{
                         </div>
                     )}
 
-                    {/* Send-to-phone button - click/tap to push the current text via ntfy */}
-                    {!loading && regions.length > 0 && (
-                        <div
-                            onClick={onSendToPhone}
-                            style={{
-                                position: "absolute",
-                                bottom: "20px",
-                                right: "20px",
-                                background: "rgba(0, 0, 0, 0.7)",
-                                padding: '10px',
-                                borderRadius: '50%',
-                                zIndex: 7003,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                            }}>
-                            <svg
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="#4caf50"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                {/* Paper plane / send icon */}
-                                <path d="M22 2 11 13" />
-                                <path d="M22 2 15 22 11 13 2 9 22 2Z" />
-                            </svg>
-                        </div>
-                    )}
-
                     {/* Original/translated toggle - click/tap to swap what the boxes display */}
                     {!loading && regions.length > 0 && (
                         <div
@@ -971,6 +940,9 @@ export const TranslatedTextOverlay: VFC<{
                                 fontWeight: 'bold',
                             }}>
                             {showOriginalText ? "Show Translation" : "Show Original"}
+                            {navSource?.isControllerNavigationEnabled() && (
+                                <span style={{ marginLeft: '8px', opacity: 0.6, fontWeight: 'normal' }}>L1/R1</span>
+                            )}
                         </div>
                     )}
                 </div>
@@ -991,7 +963,7 @@ export const TranslatedTextOverlay: VFC<{
                     zIndex: 7003,
                     pointerEvents: 'none',
                 }}>
-                    A look up · D-pad/stick choose box · B clear
+                    A look up · D-pad/stick choose box · L1/R1 original/translation · B clear
                 </div>
             )}
 
@@ -1075,7 +1047,7 @@ export const TranslatedTextOverlay: VFC<{
 
 
 // Main image overlay component
-export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSendToPhone: () => void, onSendRegion: (text: string) => void, onSendWord: (word: string) => void }> = ({ state, onDismiss, onSendToPhone, onSendRegion, onSendWord }) => {
+export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSendRegion: (text: string) => void, onSendWord: (word: string) => void }> = ({ state, onDismiss, onSendRegion, onSendWord }) => {
     const [visible, setVisible] = useState<boolean>(false);
     const [imageData, setImageData] = useState<string>("");
     const [regions, setRegions] = useState<TranslatedRegion[]>([]);
@@ -1151,7 +1123,6 @@ export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSen
             translatedTextAlignment={translatedTextAlignment}
             translatedTextFontFamily={translatedTextFontFamily}
             translatedTextFontStyle={translatedTextFontStyle}
-            onSendToPhone={onSendToPhone}
             onSendRegion={onSendRegion}
             onSendWord={onSendWord}
             navSource={state}

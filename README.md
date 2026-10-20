@@ -68,6 +68,7 @@ With a controller (can be turned off under Controls → Controller Navigation). 
 |-------|--------|--------|
 | Overlay | D-pad or either stick | Pick a text box |
 | Overlay | A | Open the dictionary for the picked box |
+| Overlay | L1 / R1 | Switch the boxes between original and translated text |
 | Overlay | B | Clear the selection |
 | Dictionary | ◀ ▶ (D-pad or stick) | Move the lookup one character |
 | Dictionary | L1 / R1 | Previous / next word |
