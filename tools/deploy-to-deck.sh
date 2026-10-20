@@ -87,5 +87,13 @@ elif ! ssh "${SSH_OPTS[@]}" "$TARGET" "$EXTRACT; status=\$?; rm -f $REMOTE_ARCHI
     exit 1
 fi
 
-echo "Done. Decky reloads the plugin by itself within a few seconds."
-echo "If the old version is still running: ssh -t $TARGET sudo systemctl restart plugin_loader"
+# Decky only hot-reloads plugins that carry the "debug" flag in plugin.json.
+# That file is root-owned, so the first deploy adds the flag with sudo (asks
+# for the deck password once) and restarts Decky so the flag takes effect.
+if ssh "${SSH_OPTS[@]}" "$TARGET" "grep -q '\"debug\"' '$PLUGIN_DIR/plugin.json'"; then
+    echo "Done. Decky reloads the plugin by itself within a few seconds."
+else
+    echo "Enabling hot reload for this plugin (one time). Enter the deck password when asked."
+    ssh -t "${SSH_OPTS[@]}" "$TARGET" "sudo sed -i 's/\"flags\": *\[\]/\"flags\": [\"debug\"]/' '$PLUGIN_DIR/plugin.json' && grep -q debug '$PLUGIN_DIR/plugin.json' && sudo systemctl restart plugin_loader"
+    echo "Done. Decky restarted with the new version; later deploys reload without a password."
+fi
