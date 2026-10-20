@@ -6,7 +6,7 @@
 # dist/index.js changes, so the new version starts within a few seconds.
 #
 # Usage: tools/deploy-to-deck.sh [host] [--no-build] [--sudo] [--dry-run]
-#   host       Deck hostname or IP (default: $DECK_HOST or steamdeck.local)
+#   host       Deck hostname or IP (default: $DECK_HOST or steamdeck-jason.local)
 #   --no-build skip "npm run build"
 #   --sudo     extract with sudo (asks for the deck password) if the plugin
 #              files on the Deck are not owned by the deck user
@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-HOST="${DECK_HOST:-steamdeck.local}"
+HOST="${DECK_HOST:-steamdeck-jason.local}"
 BUILD=1
 USE_SUDO=0
 DRY_RUN=0

@@ -81,7 +81,7 @@ With a controller (can be turned off under Controls → Controller Navigation):
 `tools/deploy-to-deck.sh` builds the plugin and copies its code to the Deck over SSH, keeping the dependencies that are already installed there. Decky reloads the plugin automatically, so the Deck can stay in Game Mode. It needs SSH enabled on the Deck once (see the script header) and the plugin installed once by the normal route.
 
 ```bash
-tools/deploy-to-deck.sh steamdeck.local
+tools/deploy-to-deck.sh
 ```
 
 From cmd or PowerShell on Windows, `tools\deploy-to-deck.cmd steamdeck.local` runs the same script through Git Bash.
