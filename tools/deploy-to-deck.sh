@@ -29,7 +29,23 @@ for arg in "$@"; do
         *) HOST="$arg" ;;
     esac
 done
+# .local (mDNS) lookups on Windows fail intermittently, so resolve the name
+# once up front, with retries, and connect by IP
+if [[ "$HOST" == *.local ]] && command -v powershell >/dev/null 2>&1 && [ "$DRY_RUN" = 0 ]; then
+    for attempt in 1 2 3 4 5; do
+        IP="$(powershell -NoProfile -Command "(Resolve-DnsName '$HOST' -Type A -ErrorAction SilentlyContinue | Select-Object -First 1).IPAddress" | tr -d '\r')"
+        [ -n "$IP" ] && break
+        sleep 1
+    done
+    if [ -n "${IP:-}" ]; then
+        echo "$HOST is $IP"
+        HOST="$IP"
+    else
+        echo "Could not resolve $HOST; is the Deck awake and on the same network? Trying the name anyway." >&2
+    fi
+fi
 TARGET="${DECK_USER:-deck}@$HOST"
+SSH_OPTS=(-o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 
 cd "$(dirname "$0")/.."
 
@@ -53,20 +69,20 @@ if [ "$DRY_RUN" = 1 ]; then
 fi
 
 echo "Looking for Decky Translator on $TARGET..."
-PLUGIN_DIR="$(ssh "$TARGET" 'for f in ~/homebrew/plugins/*/plugin.json; do grep -q "\"Decky Translator\"" "$f" && dirname "$f"; done' | head -n 1)"
+PLUGIN_DIR="$(ssh "${SSH_OPTS[@]}" "$TARGET" 'for f in ~/homebrew/plugins/*/plugin.json; do grep -q "\"Decky Translator\"" "$f" && dirname "$f"; done' | head -n 1)"
 if [ -z "$PLUGIN_DIR" ]; then
     echo "Decky Translator is not installed on $HOST. Install it once (Decky store or a release zip), then rerun this." >&2
     exit 1
 fi
 echo "Updating $PLUGIN_DIR"
 
-scp -q "$ARCHIVE" "$TARGET:$REMOTE_ARCHIVE"
+scp -q "${SSH_OPTS[@]}" "$ARCHIVE" "$TARGET:$REMOTE_ARCHIVE"
 # --overwrite rewrites files in place: the plugin folder itself is root-owned,
 # so replacing (unlinking) top-level files like main.py would be refused
 EXTRACT="tar -xzf $REMOTE_ARCHIVE --overwrite -m --no-same-owner -C '$PLUGIN_DIR'"
 if [ "$USE_SUDO" = 1 ]; then
-    ssh -t "$TARGET" "sudo $EXTRACT; status=\$?; rm -f $REMOTE_ARCHIVE; exit \$status"
-elif ! ssh "$TARGET" "$EXTRACT; status=\$?; rm -f $REMOTE_ARCHIVE; exit \$status"; then
+    ssh -t "${SSH_OPTS[@]}" "$TARGET" "sudo $EXTRACT; status=\$?; rm -f $REMOTE_ARCHIVE; exit \$status"
+elif ! ssh "${SSH_OPTS[@]}" "$TARGET" "$EXTRACT; status=\$?; rm -f $REMOTE_ARCHIVE; exit \$status"; then
     echo "Copying failed. If it was a permission error, rerun with --sudo." >&2
     exit 1
 fi
