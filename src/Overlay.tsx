@@ -8,6 +8,7 @@ import { TranslatedRegion } from "./TextTranslator";
 import { logger } from "./Logger";
 import { buildTranslatedFontFamily, ensureFontLoaded, resolveFontStyleCSS } from "./fonts";
 import type { FontStyleOption } from "./fonts";
+import { DictionaryPopup } from "./dictionary/DictionaryPopup";
 
 export type HorizontalTextAlignment = 'left' | 'right' | 'center' | 'justify';
 
@@ -364,6 +365,32 @@ function calculateFontSize(region: TranslatedRegion, scalingFactor: number, font
     return Math.max(7, Math.min(fontSize, 48));
 }
 
+// Best guess at which character of a box's recognized text sits under a tap.
+// Merged boxes only keep their combined bounds, with stacked lines joined by
+// newlines, so this assumes evenly spread characters; the popup's text strip
+// lets the user correct it.
+function estimateCharOffset(region: TranslatedRegion, x: number, y: number): number {
+    const text = region.text;
+    if (text.length <= 1) return 0;
+    const { left, top, right, bottom } = region.rect;
+    const width = Math.max(1, right - left);
+    const height = Math.max(1, bottom - top);
+    const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
+    const lines = text.split('\n');
+
+    // A single tall line is most likely vertical (tategaki) text
+    if (lines.length === 1 && height > width * 1.5) {
+        return clamp(Math.floor(((y - top) / height) * text.length), text.length - 1);
+    }
+
+    const lineIndex = clamp(Math.floor(((y - top) / height) * lines.length), lines.length - 1);
+    const line = lines[lineIndex];
+    const charIndex = clamp(Math.floor(((x - left) / width) * line.length), Math.max(0, line.length - 1));
+    let offset = 0;
+    for (let i = 0; i < lineIndex; i++) offset += lines[i].length + 1;
+    return offset + charIndex;
+}
+
 // Overlay component to display translated text
 export const TranslatedTextOverlay: VFC<{
     visible: boolean,
@@ -395,6 +422,15 @@ export const TranslatedTextOverlay: VFC<{
 
     // Whether boxes show the original recognized text instead of the translation
     const [showOriginalText, setShowOriginalText] = useState(false);
+
+    // Dictionary popup for the tapped box; key forces a fresh popup per tap
+    const [lookup, setLookup] = useState<{ index: number; offset: number; side: 'left' | 'right'; key: number } | null>(null);
+    const lookupCounter = useRef(0);
+
+    // A new capture (or dismissing the overlay) closes the popup
+    useEffect(() => {
+        setLookup(null);
+    }, [regions, visible]);
 
     // Load font as a side-effect (network request / DOM injection)
     useEffect(() => {
@@ -488,10 +524,29 @@ export const TranslatedTextOverlay: VFC<{
         };
     }
 
+    const openLookup = (index: number, clientX: number, clientY: number) => {
+        const region = regions[index];
+        let offset = 0;
+        if (imgRef.current) {
+            const imgRect = imgRef.current.getBoundingClientRect();
+            const { widthFactor, heightFactor } = getScalingFactor();
+            offset = estimateCharOffset(
+                region,
+                (clientX - imgRect.left) / widthFactor,
+                (clientY - imgRect.top) / heightFactor,
+            );
+        }
+        // Put the popup on the half of the screen away from the tapped box
+        const side = clientX < window.innerWidth / 2 ? 'right' : 'left';
+        lookupCounter.current += 1;
+        setLookup({ index, offset, side, key: lookupCounter.current });
+    };
+
     return (
         <>
         {visible && <CompositionRequest level={UIComposition.Overlay} />}
         <div id='translation-overlay'
+             onClick={() => { if (lookup) setLookup(null); }}
              style={{
                  height: "100vh",
                  width: "100vw",
@@ -638,8 +693,11 @@ export const TranslatedTextOverlay: VFC<{
                             return (
                                 <div
                                     key={index}
-                                    onClick={() => onSendRegion(region.text)}
-                                    title="Send this text to phone"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openLookup(index, e.clientX, e.clientY);
+                                    }}
+                                    title="Look up in dictionary"
                                     style={{
                                         position: "absolute",
                                         display: 'flex',
@@ -656,6 +714,7 @@ export const TranslatedTextOverlay: VFC<{
 
                                         backgroundColor: "rgba(0, 0, 0, 0.8)",
                                         color: "#FFFFFF",
+                                        outline: lookup?.index === index ? "2px solid #ffc107" : undefined,
 
                                         padding: '1px 2px',
                                         borderRadius: `${Math.round(6 * generalFactor)}px`,
@@ -775,6 +834,18 @@ export const TranslatedTextOverlay: VFC<{
                         </div>
                     )}
                 </div>
+            )}
+
+            {/* Dictionary popup for the tapped box */}
+            {lookup && regions[lookup.index] && (
+                <DictionaryPopup
+                    key={lookup.key}
+                    text={regions[lookup.index].text}
+                    initialOffset={lookup.offset}
+                    side={lookup.side}
+                    onClose={() => setLookup(null)}
+                    onSendText={onSendRegion}
+                />
             )}
 
             {/* Loading Indicator - now shown on top of the image when processing */}

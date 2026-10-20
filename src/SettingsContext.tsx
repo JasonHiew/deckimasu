@@ -42,6 +42,7 @@ export interface Settings {
     ntfyServerUrl: string; // ntfy server URL (e.g. https://ntfy.example.com)
     ntfyTopic: string; // ntfy topic name
     ntfyToken: string; // ntfy access token, if the topic requires auth
+    dictionaryAutoUpdateDays: number; // Days between automatic dictionary update checks (0 = never)
 }
 
 // Define action types
@@ -87,6 +88,7 @@ const initialSettings: Settings = {
     ntfyServerUrl: "",
     ntfyTopic: "",
     ntfyToken: "",
+    dictionaryAutoUpdateDays: 7,
 };
 
 // Create the reducer
@@ -167,6 +169,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                     ntfyServerUrl: serverSettings.ntfy_server_url || "",
                     ntfyTopic: serverSettings.ntfy_topic || "",
                     ntfyToken: serverSettings.ntfy_token || "",
+                    dictionaryAutoUpdateDays: serverSettings.dictionary_auto_update_days ?? 7,
                 };
 
                 // Update settings in context
@@ -252,7 +255,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                 translationCacheEnabled: 'translation_cache_enabled',
                 ntfyServerUrl: 'ntfy_server_url',
                 ntfyTopic: 'ntfy_topic',
-                ntfyToken: 'ntfy_token'
+                ntfyToken: 'ntfy_token',
+                dictionaryAutoUpdateDays: 'dictionary_auto_update_days'
             };
 
             // Skip settings that don't need to be saved to backend

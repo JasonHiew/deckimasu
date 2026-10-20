@@ -32,3 +32,17 @@ License: MIT License
 Python 3.11
 https://github.com/astral-sh/python-build-standalone
 License: Mozilla Public License 2.0
+
+Yomitan (dictionary lookup logic ported to Python and TypeScript: Japanese
+deinflection rules, text preprocessors, furigana distribution, structured-content rendering)
+https://github.com/yomidevs/yomitan
+License: GNU General Public License v3.0 or later
+
+JMdict / JMnedict (downloaded at runtime, not bundled)
+https://www.edrdg.org/ via https://github.com/yomidevs/jmdict-yomitan
+License: Creative Commons Attribution-ShareAlike 4.0 (property of the Electronic
+Dictionary Research and Development Group)
+
+Jiten frequency list (downloaded at runtime, not bundled)
+https://jiten.moe
+License: Creative Commons Attribution-ShareAlike 4.0

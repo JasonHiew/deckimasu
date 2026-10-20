@@ -93,6 +93,7 @@ import requests
 from providers import ProviderManager, TextRegion, NetworkError, ApiKeyError, RateLimitError
 from providers.translation_cache import TranslationCache, PROVIDER_TIERS, normalize
 from providers.ntfy_provider import NtfyProvider
+from providers.dictionary.manager import DictionaryManager, ATTRIBUTION as DICTIONARY_ATTRIBUTION
 
 _processing_lock = False
 
@@ -1189,6 +1190,9 @@ class Plugin:
     _translation_cache: TranslationCache = None
     _translation_cache_enabled: bool = True
 
+    # Dictionary lookup (Yomitan-format dictionaries)
+    _dictionary_manager: DictionaryManager = None
+
     # OCR API configurations - user must provide their own API key
     _google_vision_api_key: str = ""
     _google_translate_api_key: str = ""
@@ -1496,6 +1500,8 @@ class Plugin:
                 pass  # persisted below, read fresh in send_ntfy_notification
             elif key == "ntfy_token":
                 pass  # persisted below, read fresh in send_ntfy_notification
+            elif key == "dictionary_auto_update_days":
+                pass  # persisted below, read at startup
             else:
                 logger.warning(f"Unknown setting key: {key}")
 
@@ -1544,6 +1550,7 @@ class Plugin:
                 "ntfy_server_url": self._settings.get_setting("ntfy_server_url", ""),
                 "ntfy_topic": self._settings.get_setting("ntfy_topic", ""),
                 "ntfy_token": self._settings.get_setting("ntfy_token", ""),
+                "dictionary_auto_update_days": self._settings.get_setting("dictionary_auto_update_days", 7),
             }
             return settings
         except Exception as e:
@@ -2376,6 +2383,93 @@ class Plugin:
             logger.error(traceback.format_exc())
             return {"success": False, "error": "unknown_error", "message": str(e)}
 
+    # Dictionary lookup and management
+
+    async def dictionary_lookup(self, text: str, offset: int = 0):
+        if not self._dictionary_manager:
+            return {"success": False, "error": "unavailable", "entries": []}
+        try:
+            result = await asyncio.to_thread(self._dictionary_manager.lookup, text, int(offset))
+            result["success"] = True
+            result["hasDictionaries"] = self._dictionary_manager.has_term_dictionaries()
+            return result
+        except Exception as e:
+            logger.error(f"Dictionary lookup failed: {e}")
+            logger.error(traceback.format_exc())
+            return {"success": False, "error": "lookup_error", "message": str(e), "entries": []}
+
+    async def dictionary_get_state(self):
+        if not self._dictionary_manager:
+            return {"available": False}
+        try:
+            return {
+                "available": True,
+                "dictionaries": self._dictionary_manager.list_dictionaries(),
+                "recommended": self._dictionary_manager.recommended(),
+                "status": self._dictionary_manager.get_status(),
+                "attribution": DICTIONARY_ATTRIBUTION,
+            }
+        except Exception as e:
+            logger.error(f"Error reading dictionary state: {e}")
+            return {"available": False, "error": str(e)}
+
+    async def dictionary_get_status(self):
+        if not self._dictionary_manager:
+            return {"busy": False}
+        return self._dictionary_manager.get_status()
+
+    async def _dictionary_action(self, name, fn, *args):
+        if not self._dictionary_manager:
+            return {"success": False, "message": "Dictionaries are unavailable"}
+        try:
+            return {"success": True, "result": fn(*args)}
+        except ValueError as e:
+            return {"success": False, "message": str(e)}
+        except Exception as e:
+            logger.error(f"Dictionary {name} failed: {e}")
+            logger.error(traceback.format_exc())
+            return {"success": False, "message": str(e)}
+
+    async def dictionary_install_recommended(self, keys=None):
+        return await self._dictionary_action(
+            "install", lambda: self._dictionary_manager.install_recommended(keys))
+
+    async def dictionary_install_url(self, url: str):
+        return await self._dictionary_action(
+            "install from URL", lambda: self._dictionary_manager.install_from_url(url))
+
+    async def dictionary_install_file(self, path: str):
+        return await self._dictionary_action(
+            "install from file", lambda: self._dictionary_manager.install_from_file(path))
+
+    async def dictionary_check_updates(self):
+        return await self._dictionary_action(
+            "update check", lambda: self._dictionary_manager.check_updates())
+
+    async def dictionary_update(self, dict_id=None):
+        return await self._dictionary_action(
+            "update", lambda: self._dictionary_manager.update(dict_id))
+
+    async def dictionary_set_enabled(self, dict_id: str, enabled: bool):
+        return await self._dictionary_action(
+            "toggle", lambda: self._dictionary_manager.set_enabled(dict_id, enabled))
+
+    async def dictionary_move(self, dict_id: str, delta: int):
+        return await self._dictionary_action(
+            "reorder", lambda: self._dictionary_manager.move(dict_id, int(delta)))
+
+    async def dictionary_delete(self, dict_id: str):
+        return await self._dictionary_action(
+            "delete", lambda: self._dictionary_manager.delete(dict_id))
+
+    async def dictionary_cancel(self):
+        return await self._dictionary_action(
+            "cancel", lambda: self._dictionary_manager.cancel())
+
+    async def dictionary_clear_message(self):
+        return await self._dictionary_action(
+            "clear message", lambda: self._dictionary_manager.clear_last_error())
+
     async def get_enabled_state(self):
         return await self.get_setting("enabled", True)
 
@@ -2807,6 +2901,18 @@ class Plugin:
                 logger.error(f"Failed to open translation cache, continuing without it: {e}")
                 self._translation_cache = None
 
+            try:
+                self._dictionary_manager = DictionaryManager(
+                    os.path.join(settingsDir, "decky-translator", "dictionaries")
+                )
+                self._dictionary_manager.auto_update(
+                    load_setting("dictionary_auto_update_days", 7)
+                )
+            except Exception as e:
+                logger.error(f"Failed to initialize dictionaries, lookup disabled: {e}")
+                logger.error(traceback.format_exc())
+                self._dictionary_manager = None
+
             # Initialize provider manager
             self._provider_manager = ProviderManager()
             self._provider_manager.configure(
@@ -2902,6 +3008,10 @@ class Plugin:
             if self._translation_cache:
                 self._translation_cache.close()
                 self._translation_cache = None
+
+            if self._dictionary_manager:
+                self._dictionary_manager.shutdown()
+                self._dictionary_manager = None
 
             if self._evdev_monitor:
                 self._evdev_monitor.stop()

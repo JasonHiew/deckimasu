@@ -54,6 +54,14 @@ Might be helpful for learning a new language by playing games or some other purp
 
 Button or Combinations can be configured in the Controls tab
 
+## Dictionary lookup
+
+Tap any text box on the overlay to look up the Japanese words in it, Yomitan style. The popup shows the box's recognized text; tap any character to look up the longest word starting there, including conjugated forms (食べさせられなかった → 食べる). Results show readings, furigana, frequency ranks and definitions.
+
+- **Send to phone** sends the box's text via ntfy, and **Word** sends the selected entry with its definitions and the sentence. Tapping a box no longer sends anything by itself.
+- The Dictionary tab installs the recommended dictionaries in one step (JMdict, JMnedict and Jiten frequency, about 35 MB to download and 215 MB on disk), or any Yomitan-format dictionary from a .zip file or URL.
+- Dictionaries can be reordered, disabled, deleted and updated. Updatable dictionaries are checked automatically (weekly by default).
+
 ## How does it do that? 
 
 Decky Translator allows you to choose different Text Recognition and Translation methods - feel free to experiment.
@@ -188,6 +196,15 @@ Try other combination of text recognition and translation methods. If it doesnt 
 ## Third-Party Dependencies
 
 This plugin uses the following third-party components. None of the heavy models are bundled in the plugin zip — they're downloaded on demand by a user.
+
+### Dictionaries
+
+Downloaded on demand from the Dictionary tab. The lookup engine (deinflection rules, text normalization, furigana and structured-content rendering) is ported from [Yomitan](https://github.com/yomidevs/yomitan) (GPL-3.0-or-later).
+
+| Component | Source | License |
+|-----------|--------|---------|
+| JMdict, JMnedict | [EDRDG](https://www.edrdg.org/) via [jmdict-yomitan](https://github.com/yomidevs/jmdict-yomitan) | CC BY-SA 4.0 |
+| Jiten frequency list | [jiten.moe](https://jiten.moe/other) | CC BY-SA 4.0 |
 
 ### Chrome Screen AI library
 
