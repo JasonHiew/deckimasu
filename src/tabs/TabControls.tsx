@@ -20,17 +20,26 @@ import { useSettings } from "../SettingsContext";
 import { InputMode } from "../Input";
 import { useFontOptions, isRemoteFont, loadRemoteFont } from "../fonts";
 
-// ntfy settings modal - edits server URL, topic, and access token together
+// Links the dictionary's Word button can attach; {word} is filled in
+const WORD_LINK_PRESETS = [
+    { label: "Shirabe Jisho", link: "shirabelookup://search?w={word}" },
+    { label: "Shirabe via Shortcut", link: "shortcuts://run-shortcut?name=Shirabe&input=text&text={word}" },
+    { label: "None", link: "" },
+];
+
+// ntfy settings modal - edits server URL, topic, access token and word link together
 const NtfySettingsModal: VFC<{
     currentServerUrl: string;
     currentTopic: string;
     currentToken: string;
-    onSave: (serverUrl: string, topic: string, token: string) => void;
+    currentWordLink: string;
+    onSave: (serverUrl: string, topic: string, token: string, wordLink: string) => void;
     closeModal?: () => void;
-}> = ({ currentServerUrl, currentTopic, currentToken, onSave, closeModal }) => {
+}> = ({ currentServerUrl, currentTopic, currentToken, currentWordLink, onSave, closeModal }) => {
     const [serverUrl, setServerUrl] = useState(currentServerUrl || "");
     const [topic, setTopic] = useState(currentTopic || "");
     const [token, setToken] = useState(currentToken || "");
+    const [wordLink, setWordLink] = useState(currentWordLink || "");
 
     return (
         <ModalRoot onCancel={closeModal} onEscKeypress={closeModal}>
@@ -58,6 +67,24 @@ const NtfySettingsModal: VFC<{
                     bShowClearAction={true}
                     onChange={(e) => setToken(e.target.value)}
                 />
+                <TextField
+                    label="Word link (opened when a word notification is tapped)"
+                    value={wordLink}
+                    bShowClearAction={true}
+                    onChange={(e) => setWordLink(e.target.value)}
+                />
+                <p style={{ margin: "6px 0 8px", color: "#aaa", fontSize: "12px" }}>
+                    {"{word}"} is replaced with the word. "Shirabe via Shortcut" runs an iOS Shortcut named
+                    Shirabe that copies the word and then opens Shirabe Jisho, so its clipboard search can stay on.
+                </p>
+                <Focusable style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    {WORD_LINK_PRESETS.map(p => (
+                        <DialogButton key={p.label} style={{ width: "auto", minWidth: "0", padding: "6px 12px" }}
+                                      onClick={() => setWordLink(p.link)}>
+                            {p.label}
+                        </DialogButton>
+                    ))}
+                </Focusable>
                 <Focusable
                     style={{ display: "flex", gap: "10px", marginTop: "20px", justifyContent: "flex-end" }}
                 >
@@ -66,7 +93,7 @@ const NtfySettingsModal: VFC<{
                     </DialogButton>
                     <DialogButton
                         onClick={() => {
-                            onSave(serverUrl.trim(), topic.trim(), token.trim());
+                            onSave(serverUrl.trim(), topic.trim(), token.trim(), wordLink.trim());
                             closeModal?.();
                         }}
                     >
@@ -347,10 +374,12 @@ export const TabControls: VFC<TabControlsProps> = ({ inputDiagnostics }) => {
                                         currentServerUrl={settings.ntfyServerUrl}
                                         currentTopic={settings.ntfyTopic}
                                         currentToken={settings.ntfyToken}
-                                        onSave={(serverUrl, topic, token) => {
+                                        currentWordLink={settings.ntfyWordLink}
+                                        onSave={(serverUrl, topic, token, wordLink) => {
                                             updateSetting('ntfyServerUrl', serverUrl, 'ntfy Server URL');
                                             updateSetting('ntfyTopic', topic, 'ntfy Topic');
                                             updateSetting('ntfyToken', token, 'ntfy Access Token');
+                                            updateSetting('ntfyWordLink', wordLink, 'Word link');
                                         }}
                                     />
                                 );

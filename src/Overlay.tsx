@@ -483,8 +483,9 @@ export const TranslatedTextOverlay: VFC<{
     translatedTextFontStyle: FontStyleOption,
     onSendToPhone: () => void,
     onSendRegion: (text: string) => void,
+    onSendWord: (word: string) => void,
     navSource?: ImageState
-}> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle, onSendToPhone, onSendRegion, navSource }) => {
+}> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle, onSendToPhone, onSendRegion, onSendWord, navSource }) => {
     // Composition layer is handled by CompositionRequest below -- only mounted when visible
 
     // Ref to the screenshot image element
@@ -1005,6 +1006,7 @@ export const TranslatedTextOverlay: VFC<{
                     showControllerHints={lookup.viaController && (navSource?.isControllerNavigationEnabled() ?? false)}
                     onClose={() => setLookup(null)}
                     onSendText={onSendRegion}
+                    onSendWord={onSendWord}
                 />
             )}
 
@@ -1073,7 +1075,7 @@ export const TranslatedTextOverlay: VFC<{
 
 
 // Main image overlay component
-export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSendToPhone: () => void, onSendRegion: (text: string) => void }> = ({ state, onDismiss, onSendToPhone, onSendRegion }) => {
+export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSendToPhone: () => void, onSendRegion: (text: string) => void, onSendWord: (word: string) => void }> = ({ state, onDismiss, onSendToPhone, onSendRegion, onSendWord }) => {
     const [visible, setVisible] = useState<boolean>(false);
     const [imageData, setImageData] = useState<string>("");
     const [regions, setRegions] = useState<TranslatedRegion[]>([]);
@@ -1151,6 +1153,7 @@ export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSen
             translatedTextFontStyle={translatedTextFontStyle}
             onSendToPhone={onSendToPhone}
             onSendRegion={onSendRegion}
+            onSendWord={onSendWord}
             navSource={state}
         />
     );

@@ -202,6 +202,7 @@ interface DictionaryPopupProps {
     showControllerHints?: boolean;
     onClose: () => void;
     onSendText: (text: string) => void;
+    onSendWord: (word: string) => void;
 }
 
 const HintKey: VFC<{ label: string }> = ({ label }) => (
@@ -212,7 +213,7 @@ const HintKey: VFC<{ label: string }> = ({ label }) => (
 );
 
 export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopupProps>(({
-    text, initialOffset, side, showControllerHints = false, onClose, onSendText,
+    text, initialOffset, side, showControllerHints = false, onClose, onSendText, onSendWord,
 }, ref) => {
     const [history, setHistory] = useState<HistoryItem[]>([{ kind: 'scan', offset: initialOffset }]);
     const [result, setResult] = useState<LookupResult | null>(null);
@@ -355,7 +356,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                 onSendText(text);
                 break;
             case 'y':
-                if (entries[selectedEntry]) onSendText(entries[selectedEntry].term);
+                if (entries[selectedEntry]) onSendWord(entries[selectedEntry].term);
                 break;
             case 'a':
                 if (noDictionaries && !installStatus) installRecommended();
@@ -487,7 +488,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                             selected={controllerActive && i === selectedEntry}
                             elementRef={(el) => { entryRefs.current[i] = el; }}
                             onLookupTerm={lookupTerm}
-                            onSendWord={(e) => onSendText(e.term)}
+                            onSendWord={(e) => onSendWord(e.term)}
                         />
                     ))
                 )}

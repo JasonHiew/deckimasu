@@ -16,7 +16,7 @@ import base64
 import tarfile
 import shutil
 import glob
-from urllib.parse import urlparse, unquote
+from urllib.parse import urlparse, unquote, quote
 
 # IMPORTANT: Set up plugin directory FIRST
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -96,6 +96,9 @@ from providers.ntfy_provider import NtfyProvider
 from providers.dictionary.manager import DictionaryManager, ATTRIBUTION as DICTIONARY_ATTRIBUTION
 
 _processing_lock = False
+
+# Opened when a word notification is tapped; {word} is replaced (URL-encoded)
+DEFAULT_NTFY_WORD_LINK = "shirabelookup://search?w={word}"
 
 SENSITIVE_SETTING_KEYS = {
     "google_api_key",
@@ -1540,6 +1543,8 @@ class Plugin:
                 pass  # persisted below, read fresh in send_ntfy_notification
             elif key == "ntfy_token":
                 pass  # persisted below, read fresh in send_ntfy_notification
+            elif key == "ntfy_word_link":
+                pass  # persisted below, read fresh in send_ntfy_word
             elif key == "dictionary_auto_update_days":
                 pass  # persisted below, read at startup
             elif key == "overlay_controller_navigation":
@@ -1592,6 +1597,7 @@ class Plugin:
                 "ntfy_server_url": self._settings.get_setting("ntfy_server_url", ""),
                 "ntfy_topic": self._settings.get_setting("ntfy_topic", ""),
                 "ntfy_token": self._settings.get_setting("ntfy_token", ""),
+                "ntfy_word_link": self._settings.get_setting("ntfy_word_link", DEFAULT_NTFY_WORD_LINK),
                 "dictionary_auto_update_days": self._settings.get_setting("dictionary_auto_update_days", 7),
                 "overlay_controller_navigation": self._settings.get_setting("overlay_controller_navigation", True),
             }
@@ -2403,14 +2409,20 @@ class Plugin:
             logger.error(traceback.format_exc())
             return None
 
-    async def send_ntfy_notification(self, text: str):
+    async def send_ntfy_word(self, word: str):
+        """Sends a dictionary word, linked so tapping it opens a lookup app on the phone."""
+        template = self._settings.get_setting("ntfy_word_link", DEFAULT_NTFY_WORD_LINK) or ""
+        click_url = template.replace("{word}", quote(word, safe="")) if template else ""
+        return await self.send_ntfy_notification(word, click_url)
+
+    async def send_ntfy_notification(self, text: str, click_url: str = ""):
         try:
             provider = NtfyProvider(
                 server_url=self._settings.get_setting("ntfy_server_url", ""),
                 topic=self._settings.get_setting("ntfy_topic", ""),
                 token=self._settings.get_setting("ntfy_token", ""),
             )
-            await asyncio.to_thread(provider.send, text)
+            await asyncio.to_thread(provider.send, text, click_url)
             return {"success": True}
         except NetworkError as e:
             logger.error(f"Network error sending ntfy notification: {e}")

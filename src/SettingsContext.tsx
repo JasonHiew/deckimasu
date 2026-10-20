@@ -42,6 +42,7 @@ export interface Settings {
     ntfyServerUrl: string; // ntfy server URL (e.g. https://ntfy.example.com)
     ntfyTopic: string; // ntfy topic name
     ntfyToken: string; // ntfy access token, if the topic requires auth
+    ntfyWordLink: string; // Link opened when a word notification is tapped; {word} is filled in
     dictionaryAutoUpdateDays: number; // Days between automatic dictionary update checks (0 = never)
     overlayControllerNavigation: boolean; // D-pad/face buttons drive the overlay and dictionary popup
 }
@@ -89,6 +90,7 @@ const initialSettings: Settings = {
     ntfyServerUrl: "",
     ntfyTopic: "",
     ntfyToken: "",
+    ntfyWordLink: "shirabelookup://search?w={word}",
     dictionaryAutoUpdateDays: 7,
     overlayControllerNavigation: true,
 };
@@ -171,6 +173,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                     ntfyServerUrl: serverSettings.ntfy_server_url || "",
                     ntfyTopic: serverSettings.ntfy_topic || "",
                     ntfyToken: serverSettings.ntfy_token || "",
+                    ntfyWordLink: serverSettings.ntfy_word_link ?? "shirabelookup://search?w={word}",
                     dictionaryAutoUpdateDays: serverSettings.dictionary_auto_update_days ?? 7,
                     overlayControllerNavigation: serverSettings.overlay_controller_navigation ?? true,
                 };
@@ -260,6 +263,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                 ntfyServerUrl: 'ntfy_server_url',
                 ntfyTopic: 'ntfy_topic',
                 ntfyToken: 'ntfy_token',
+                ntfyWordLink: 'ntfy_word_link',
                 dictionaryAutoUpdateDays: 'dictionary_auto_update_days',
                 overlayControllerNavigation: 'overlay_controller_navigation'
             };

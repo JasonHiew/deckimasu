@@ -350,12 +350,18 @@ export class GameTranslatorLogic {
         await this.sendTextToPhone(text);
     }
 
-    private sendTextToPhone = async (text: string): Promise<void> => {
+    // Sends a dictionary word; the backend attaches the configured lookup link
+    // (e.g. Shirabe Jisho) so tapping the notification opens it on that word.
+    sendWordToPhone = async (word: string): Promise<void> => {
+        await this.sendTextToPhone(word, 'send_ntfy_word');
+    }
+
+    private sendTextToPhone = async (text: string, method: string = 'send_ntfy_notification'): Promise<void> => {
         if (this.sendingToPhone) return;
 
         this.sendingToPhone = true;
         try {
-            const result = await call<[string], NtfyResult>('send_ntfy_notification', text);
+            const result = await call<[string], NtfyResult>(method, text);
 
             if (result && result.success) {
                 this.notify("Sent to phone", 1500);

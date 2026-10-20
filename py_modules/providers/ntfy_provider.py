@@ -23,8 +23,12 @@ class NtfyProvider:
     def is_configured(self) -> bool:
         return bool(self._server_url and self._topic)
 
-    def send(self, message: str) -> None:
-        """Publish message to the configured ntfy topic. Raises on failure."""
+    def send(self, message: str, click_url: str = "") -> None:
+        """
+        Publish message to the configured ntfy topic. Raises on failure.
+        click_url, if given, is opened when the notification is tapped (any
+        scheme the phone can handle, e.g. an app's lookup link).
+        """
         if not self.is_configured():
             raise ApiKeyError("ntfy server URL and topic must be configured")
 
@@ -32,6 +36,8 @@ class NtfyProvider:
         headers = {}
         if self._token:
             headers["Authorization"] = f"Bearer {self._token}"
+        if click_url:
+            headers["Click"] = click_url
 
         try:
             response = requests.post(
