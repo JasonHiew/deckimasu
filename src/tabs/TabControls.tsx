@@ -396,7 +396,7 @@ export const TabControls: VFC<TabControlsProps> = ({ inputDiagnostics }) => {
                     <ToggleField
                         checked={settings.overlayControllerNavigation}
                         label="Controller Navigation"
-                        description={<>On the overlay, the D-pad picks a text box and A opens the dictionary. In the dictionary, ◀▶ move by character, L1/R1 by word, ▲▼ pick an entry, X sends the text, Y sends the word, B goes back.<br /><br />Turn off if the game reacts to these buttons while the overlay is open.</>}
+                        description={<>On the overlay, the D-pad or either stick picks a text box and A opens the dictionary. In the dictionary, ◀▶ move by character, L1/R1 by word, ▲▼ pick an entry, X sends the text, Y sends the word, B goes back.<br /><br />Turn off if the game reacts to these buttons while the overlay is open.</>}
                         onChange={(value) => updateSetting('overlayControllerNavigation', value, 'Controller navigation')}
                     />
                 </PanelSectionRow>

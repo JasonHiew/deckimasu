@@ -991,7 +991,7 @@ export const TranslatedTextOverlay: VFC<{
                     zIndex: 7003,
                     pointerEvents: 'none',
                 }}>
-                    A look up · D-pad choose box · B clear
+                    A look up · D-pad/stick choose box · B clear
                 </div>
             )}
 

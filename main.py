@@ -222,6 +222,49 @@ import struct
 import select
 
 
+class StickDirections:
+    """
+    Turns one analog stick into D-pad-like presses (<prefix>_UP/DOWN/LEFT/RIGHT)
+    for the overlay's controller navigation: a press when the stick is pushed
+    past PRESS along its dominant axis, repeating while held, and a release
+    once it falls back under RELEASE.
+    """
+    PRESS = 0.6
+    RELEASE = 0.4
+    REPEAT_DELAY = 0.4
+    REPEAT_INTERVAL = 0.15
+
+    def __init__(self, prefix):
+        self.prefix = prefix
+        self.held = None  # held direction name, if any
+        self._axis = None  # (index into (x, y), sign) of the held direction
+        self._next_repeat = 0.0
+
+    def update(self, x, y, now):
+        """x, y in -1..1 with y positive = up. Returns a direction to count as a press, or None."""
+        if self.held is not None:
+            index, sign = self._axis
+            if (x, y)[index] * sign < self.RELEASE:
+                self.held = None
+                self._axis = None
+                return None
+            if now >= self._next_repeat:
+                self._next_repeat = now + self.REPEAT_INTERVAL
+                return self.held
+            return None
+
+        if max(abs(x), abs(y)) < self.PRESS:
+            return None
+        if abs(x) >= abs(y):
+            self._axis = (0, 1 if x > 0 else -1)
+            self.held = f"{self.prefix}_{'RIGHT' if x > 0 else 'LEFT'}"
+        else:
+            self._axis = (1, 1 if y > 0 else -1)
+            self.held = f"{self.prefix}_{'UP' if y > 0 else 'DOWN'}"
+        self._next_repeat = now + self.REPEAT_DELAY
+        return self.held
+
+
 class HidrawButtonMonitor:
     """
     Monitors Steam Deck controller via /dev/hidraw for low-level button detection.
@@ -290,6 +333,8 @@ class HidrawButtonMonitor:
         # Monotonic per-button press counts, so pollers can see taps that
         # start and end between two polls without consuming shared events
         self.press_counts = {}
+        # Analog sticks, reported as LSTICK_*/RSTICK_* presses for overlay navigation
+        self.sticks = (StickDirections("LSTICK"), StickDirections("RSTICK"))
         self.last_buttons_l = 0
         self.last_buttons_h = 0
         self.error_count = 0
@@ -543,6 +588,18 @@ class HidrawButtonMonitor:
 
     def _process_packet(self, data):
         """Parse HID packet and generate button events."""
+        # Sticks: s16 X/Y at bytes 48-51 (left) and 52-55 (right), Y positive
+        # = up (see steam_deck_axis_mappings in the kernel's hid-steam.c).
+        # Checked on every packet so held directions keep repeating.
+        if len(data) >= 56:
+            lx, ly, rx, ry = struct.unpack('<hhhh', data[48:56])
+            now = time.time()
+            for stick, x, y in ((self.sticks[0], lx, ly), (self.sticks[1], rx, ry)):
+                direction = stick.update(x / 32767.0, y / 32767.0, now)
+                if direction:
+                    with self.lock:
+                        self.press_counts[direction] = self.press_counts.get(direction, 0) + 1
+
         # Parse button states from packet
         buttons_l = struct.unpack('<I', data[8:12])[0]
         buttons_h = struct.unpack('<I', data[12:16])[0]
@@ -897,6 +954,9 @@ class EvdevGamepadMonitor:
         17: ('DPAD_UP', 'DPAD_DOWN'),
     }
 
+    # Analog sticks: ABS_X/ABS_Y (left) and ABS_RX/ABS_RY (right); evdev Y grows downwards
+    STICK_AXES = {0: (0, 'x'), 1: (0, 'y'), 3: (1, 'x'), 4: (1, 'y')}
+
     def __init__(self):
         self.running = False
         self.thread = None
@@ -908,6 +968,8 @@ class EvdevGamepadMonitor:
         self.press_counts = {}
         self.lock = threading.Lock()
         self.last_scan_time = 0
+        # fd -> {"axes": {code: normalized value}, "sticks": (left, right), "ranges": {code: (min, max)}}
+        self.stick_state = {}
         logger.debug("EvdevGamepadMonitor initialized")
 
     def _is_gamepad(self, dev):
@@ -1012,6 +1074,12 @@ class EvdevGamepadMonitor:
                 self._remove_stale_devices()
                 continue
 
+            # A held stick sends no events, so idle devices get ticked for repeats
+            now = time.time()
+            for fd in fds:
+                if fd not in readable:
+                    self._tick_sticks(fd, now)
+
             for fd in readable:
                 with self.lock:
                     dev = self.devices.get(fd)
@@ -1030,6 +1098,8 @@ class EvdevGamepadMonitor:
                                         self.current_buttons.add(name)
                                     elif event.value == 0:  # released
                                         self.current_buttons.discard(name)
+                        elif event.type == 3 and event.code in self.STICK_AXES:  # EV_ABS stick
+                            self._update_stick_axis(fd, dev, event.code, event.value)
                         elif event.type == 3 and event.code in self.HAT_AXES:  # EV_ABS hat
                             negative, positive = self.HAT_AXES[event.code]
                             with self.lock:
@@ -1048,7 +1118,39 @@ class EvdevGamepadMonitor:
 
         logger.info("EvdevGamepadMonitor loop ended")
 
+    def _update_stick_axis(self, fd, dev, code, value):
+        state = self.stick_state.setdefault(fd, {
+            "axes": {}, "ranges": {},
+            "sticks": (StickDirections("LSTICK"), StickDirections("RSTICK")),
+        })
+        rng = state["ranges"].get(code)
+        if rng is None:
+            try:
+                info = dev.absinfo(code)
+                rng = (info.min, info.max)
+            except Exception:
+                rng = (-32768, 32767)
+            state["ranges"][code] = rng
+        lo, hi = rng
+        half = (hi - lo) / 2.0 or 1.0
+        state["axes"][code] = max(-1.0, min(1.0, (value - (lo + hi) / 2.0) / half))
+        self._tick_sticks(fd, time.time())
+
+    def _tick_sticks(self, fd, now):
+        """Re-evaluates a device's sticks; also called on idle loops so held sticks repeat."""
+        state = self.stick_state.get(fd)
+        if not state:
+            return
+        axes = state["axes"]
+        for index, stick in enumerate(state["sticks"]):
+            x_code, y_code = (0, 1) if index == 0 else (3, 4)
+            direction = stick.update(axes.get(x_code, 0.0), -axes.get(y_code, 0.0), now)
+            if direction:
+                with self.lock:
+                    self.press_counts[direction] = self.press_counts.get(direction, 0) + 1
+
     def _remove_device(self, fd):
+        self.stick_state.pop(fd, None)
         with self.lock:
             dev = self.devices.pop(fd, None)
             if dev:

@@ -62,16 +62,16 @@ Tap any text box on the overlay to look up the Japanese words in it, Yomitan sty
 - The Dictionary tab installs the recommended dictionaries in one step (JMdict, JMnedict and Jiten frequency, about 35 MB to download and 215 MB on disk), or any Yomitan-format dictionary from a .zip file or URL.
 - Dictionaries can be reordered, disabled, deleted and updated. Updatable dictionaries are checked automatically (weekly by default).
 
-With a controller (can be turned off under Controls → Controller Navigation):
+With a controller (can be turned off under Controls → Controller Navigation). The sticks work like the D-pad and repeat while held:
 
 | Where | Button | Action |
 |-------|--------|--------|
-| Overlay | D-pad | Pick a text box |
+| Overlay | D-pad or either stick | Pick a text box |
 | Overlay | A | Open the dictionary for the picked box |
 | Overlay | B | Clear the selection |
-| Dictionary | ◀ ▶ | Move the lookup one character |
+| Dictionary | ◀ ▶ (D-pad or stick) | Move the lookup one character |
 | Dictionary | L1 / R1 | Previous / next word |
-| Dictionary | ▲ ▼ | Pick an entry |
+| Dictionary | ▲ ▼ (D-pad or stick) | Pick an entry |
 | Dictionary | X | Send the box's text to your phone |
 | Dictionary | Y | Send the picked entry's word (dictionary form only) |
 | Dictionary | B | Back after following a cross-reference, otherwise close |
