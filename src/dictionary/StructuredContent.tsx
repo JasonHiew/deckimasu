@@ -207,31 +207,3 @@ export const Glossary: VFC<{ items: any[]; onLookup?: (term: string) => void }> 
         </>
     );
 };
-
-// Plain-text rendering of a glossary, for sending a word to the phone
-export function glossaryToText(items: any[]): string {
-    const parts: string[] = [];
-    const walk = (node: any, out: string[]) => {
-        if (node === null || node === undefined) return;
-        if (typeof node === 'string' || typeof node === 'number') { out.push(String(node)); return; }
-        if (Array.isArray(node)) { node.forEach(n => walk(n, out)); return; }
-        if (typeof node === 'object') {
-            // Only the actual glosses; skip notes, references and forms tables
-            if (node.data && node.data.content && node.data.content !== 'glossary') return;
-            if (node.tag === 'rt' || node.tag === 'rp') return;
-            if (node.tag === 'li') {
-                const li: string[] = [];
-                walk(node.content, li);
-                out.push(li.join('') + '; ');
-                return;
-            }
-            walk(node.content, out);
-        }
-    };
-    for (const item of items) {
-        if (typeof item === 'string') parts.push(item + '; ');
-        else if (item?.type === 'text') parts.push(item.text + '; ');
-        else if (item?.type === 'structured-content') walk(item.content, parts);
-    }
-    return parts.join('').replace(/;\s*$/, '').trim();
-}

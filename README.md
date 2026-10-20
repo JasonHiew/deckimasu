@@ -58,7 +58,7 @@ Button or Combinations can be configured in the Controls tab
 
 Tap any text box on the overlay to look up the Japanese words in it, Yomitan style. The popup shows the box's recognized text; tap any character to look up the longest word starting there, including conjugated forms (食べさせられなかった → 食べる). Results show readings, furigana, frequency ranks and definitions.
 
-- **Send to phone** sends the box's text via ntfy, and **Word** sends the selected entry with its definitions and the sentence. Tapping a box no longer sends anything by itself.
+- **Send to phone** sends the box's text via ntfy, and **Word** sends just the word in its dictionary form (行ってしまった → 行く), ready to paste into another dictionary app. Tapping a box no longer sends anything by itself.
 - The Dictionary tab installs the recommended dictionaries in one step (JMdict, JMnedict and Jiten frequency, about 35 MB to download and 215 MB on disk), or any Yomitan-format dictionary from a .zip file or URL.
 - Dictionaries can be reordered, disabled, deleted and updated. Updatable dictionaries are checked automatically (weekly by default).
 
@@ -73,7 +73,7 @@ With a controller (can be turned off under Controls → Controller Navigation):
 | Dictionary | L1 / R1 | Previous / next word |
 | Dictionary | ▲ ▼ | Pick an entry |
 | Dictionary | X | Send the box's text to your phone |
-| Dictionary | Y | Send the picked entry (word, reading, definitions and sentence) |
+| Dictionary | Y | Send the picked entry's word (dictionary form only) |
 | Dictionary | B | Back after following a cross-reference, otherwise close |
 
 ## Updating a Deck from a PC (no Desktop Mode)

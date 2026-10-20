@@ -8,7 +8,7 @@ import { call } from "@decky/api";
 import { CSSProperties, VFC, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { logger } from "../Logger";
 import type { NavButton } from "../Input";
-import { Glossary, glossaryToText } from "./StructuredContent";
+import { Glossary } from "./StructuredContent";
 import { DictionaryDefinition, DictionaryEntry, DictionaryJobStatus, DictionaryTag, LookupResult } from "./types";
 
 type HistoryItem =
@@ -96,18 +96,6 @@ function groupByDictionary(definitions: DictionaryDefinition[]): [string, Dictio
 // JMdict titles carry the release date ("JMdict [2026-10-20]"); drop it for labels
 function shortDictionaryName(title: string): string {
     return title.replace(/\s*\[\d{4}-\d{2}-\d{2}\]\s*$/, '');
-}
-
-function entryToText(entry: DictionaryEntry, sentence: string): string {
-    const head = entry.reading && entry.reading !== entry.term ? `${entry.term}【${entry.reading}】` : entry.term;
-    const senses = entry.definitions
-        .filter(d => !d.isForms)
-        .slice(0, 5)
-        .map((d, i) => `${i + 1}. ${glossaryToText(d.glossary)}`)
-        .filter(s => s.length > 3);
-    const parts = [head, ...senses];
-    if (sentence) parts.push('', sentence);
-    return parts.join('\n');
 }
 
 const EntryView: VFC<{
@@ -367,7 +355,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                 onSendText(text);
                 break;
             case 'y':
-                if (entries[selectedEntry]) onSendText(entryToText(entries[selectedEntry], text));
+                if (entries[selectedEntry]) onSendText(entries[selectedEntry].term);
                 break;
             case 'a':
                 if (noDictionaries && !installStatus) installRecommended();
@@ -499,7 +487,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                             selected={controllerActive && i === selectedEntry}
                             elementRef={(el) => { entryRefs.current[i] = el; }}
                             onLookupTerm={lookupTerm}
-                            onSendWord={(e) => onSendText(entryToText(e, text))}
+                            onSendWord={(e) => onSendText(e.term)}
                         />
                     ))
                 )}
