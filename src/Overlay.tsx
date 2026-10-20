@@ -8,7 +8,8 @@ import { TranslatedRegion } from "./TextTranslator";
 import { logger } from "./Logger";
 import { buildTranslatedFontFamily, ensureFontLoaded, resolveFontStyleCSS } from "./fonts";
 import type { FontStyleOption } from "./fonts";
-import { DictionaryPopup } from "./dictionary/DictionaryPopup";
+import { DictionaryPopup, DictionaryPopupHandle } from "./dictionary/DictionaryPopup";
+import type { NavButton } from "./Input";
 
 export type HorizontalTextAlignment = 'left' | 'right' | 'center' | 'justify';
 
@@ -73,6 +74,31 @@ export class ImageState {
         if (index !== -1) {
             this.onStateChangedListeners.splice(index, 1);
         }
+    }
+
+    // Controller navigation events, relayed from Input while the overlay is shown
+    private navListeners: Array<(button: NavButton) => void> = [];
+    private controllerNavigation = true;
+
+    onNav(callback: (button: NavButton) => void): void {
+        this.navListeners.push(callback);
+    }
+
+    offNav(callback: (button: NavButton) => void): void {
+        const index = this.navListeners.indexOf(callback);
+        if (index !== -1) this.navListeners.splice(index, 1);
+    }
+
+    emitNav(button: NavButton): void {
+        for (const callback of this.navListeners) callback(button);
+    }
+
+    setControllerNavigation(enabled: boolean): void {
+        this.controllerNavigation = enabled;
+    }
+
+    isControllerNavigationEnabled(): boolean {
+        return this.controllerNavigation;
     }
 
     // Show the overlay with loading indicator immediately
@@ -391,6 +417,55 @@ function estimateCharOffset(region: TranslatedRegion, x: number, y: number): num
     return offset + charIndex;
 }
 
+// D-pad box selection: the nearest box whose center lies in the pressed
+// direction, preferring boxes in line with the current one. With nothing
+// selected yet, starts at the top-left box.
+function nextRegionIndex(regions: TranslatedRegion[], current: number | null, direction: NavButton): number | null {
+    if (regions.length === 0) return null;
+    const center = (r: TranslatedRegion) => ({
+        x: (r.rect.left + r.rect.right) / 2,
+        y: (r.rect.top + r.rect.bottom) / 2,
+    });
+    if (current === null || !regions[current]) {
+        let best = 0;
+        regions.forEach((r, i) => {
+            const b = regions[best].rect;
+            if (r.rect.top < b.top - 4 || (Math.abs(r.rect.top - b.top) <= 4 && r.rect.left < b.left)) best = i;
+        });
+        return best;
+    }
+    const from = center(regions[current]);
+    let best: number | null = null;
+    let bestScore = Infinity;
+    regions.forEach((r, i) => {
+        if (i === current) return;
+        const c = center(r);
+        const dx = c.x - from.x;
+        const dy = c.y - from.y;
+        let along: number, across: number;
+        switch (direction) {
+            case 'right': along = dx; across = dy; break;
+            case 'left': along = -dx; across = dy; break;
+            case 'down': along = dy; across = dx; break;
+            case 'up': along = -dy; across = dx; break;
+            default: return;
+        }
+        if (along <= 1) return;
+        const score = along + Math.abs(across) * 2;
+        if (score < bestScore) {
+            bestScore = score;
+            best = i;
+        }
+    });
+    return best ?? current;
+}
+
+// First character worth looking up when a box is opened from the controller
+function firstJapaneseOffset(text: string): number {
+    const i = Array.from(text).findIndex(ch => /[぀-ヿ㐀-鿿豈-﫿ｦ-ﾟ]/.test(ch));
+    return i === -1 ? 0 : i;
+}
+
 // Overlay component to display translated text
 export const TranslatedTextOverlay: VFC<{
     visible: boolean,
@@ -407,8 +482,9 @@ export const TranslatedTextOverlay: VFC<{
     translatedTextFontFamily: string,
     translatedTextFontStyle: FontStyleOption,
     onSendToPhone: () => void,
-    onSendRegion: (text: string) => void
-}> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle, onSendToPhone, onSendRegion }) => {
+    onSendRegion: (text: string) => void,
+    navSource?: ImageState
+}> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle, onSendToPhone, onSendRegion, navSource }) => {
     // Composition layer is handled by CompositionRequest below -- only mounted when visible
 
     // Ref to the screenshot image element
@@ -424,12 +500,17 @@ export const TranslatedTextOverlay: VFC<{
     const [showOriginalText, setShowOriginalText] = useState(false);
 
     // Dictionary popup for the tapped box; key forces a fresh popup per tap
-    const [lookup, setLookup] = useState<{ index: number; offset: number; side: 'left' | 'right'; key: number } | null>(null);
+    const [lookup, setLookup] = useState<{ index: number; offset: number; side: 'left' | 'right'; key: number; viaController: boolean } | null>(null);
     const lookupCounter = useRef(0);
+    const popupRef = useRef<DictionaryPopupHandle>(null);
+
+    // Box picked with the D-pad (opened with A)
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
     // A new capture (or dismissing the overlay) closes the popup
     useEffect(() => {
         setLookup(null);
+        setSelectedIndex(null);
     }, [regions, visible]);
 
     // Load font as a side-effect (network request / DOM injection)
@@ -539,8 +620,64 @@ export const TranslatedTextOverlay: VFC<{
         // Put the popup on the half of the screen away from the tapped box
         const side = clientX < window.innerWidth / 2 ? 'right' : 'left';
         lookupCounter.current += 1;
-        setLookup({ index, offset, side, key: lookupCounter.current });
+        setLookup({ index, offset, side, key: lookupCounter.current, viaController: false });
     };
+
+    const openLookupFromController = (index: number) => {
+        const region = regions[index];
+        let centerX = window.innerWidth / 2;
+        if (imgRef.current) {
+            const imgRect = imgRef.current.getBoundingClientRect();
+            const { widthFactor } = getScalingFactor();
+            centerX = imgRect.left + ((region.rect.left + region.rect.right) / 2) * widthFactor;
+        }
+        lookupCounter.current += 1;
+        setLookup({
+            index,
+            offset: firstJapaneseOffset(region.text),
+            side: centerX < window.innerWidth / 2 ? 'right' : 'left',
+            key: lookupCounter.current,
+            viaController: true,
+        });
+    };
+
+    // Controller: D-pad picks a box and A opens it; while the popup is open
+    // every button goes to the popup. The ref keeps the subscription stable
+    // while the handler always sees the latest state.
+    const handleNavRef = useRef<(button: NavButton) => void>(() => {});
+    handleNavRef.current = (button: NavButton) => {
+        if (!visible || loading) return;
+        if (lookup) {
+            popupRef.current?.handleNav(button);
+            return;
+        }
+        if (!translationsVisible || regions.length === 0) return;
+        switch (button) {
+            case 'up':
+            case 'down':
+            case 'left':
+            case 'right':
+                setSelectedIndex(current => nextRegionIndex(regions, current, button));
+                break;
+            case 'a':
+                if (selectedIndex !== null && regions[selectedIndex]) {
+                    openLookupFromController(selectedIndex);
+                } else {
+                    setSelectedIndex(nextRegionIndex(regions, null, button));
+                }
+                break;
+            case 'b':
+                setSelectedIndex(null);
+                break;
+        }
+    };
+
+    useEffect(() => {
+        if (!navSource) return;
+        const listener = (button: NavButton) => handleNavRef.current(button);
+        navSource.onNav(listener);
+        return () => navSource.offNav(listener);
+    }, [navSource]);
 
     return (
         <>
@@ -714,7 +851,9 @@ export const TranslatedTextOverlay: VFC<{
 
                                         backgroundColor: "rgba(0, 0, 0, 0.8)",
                                         color: "#FFFFFF",
-                                        outline: lookup?.index === index ? "2px solid #ffc107" : undefined,
+                                        outline: lookup?.index === index
+                                            ? "2px solid #ffc107"
+                                            : selectedIndex === index ? "2px solid #4fc3f7" : undefined,
 
                                         padding: '1px 2px',
                                         borderRadius: `${Math.round(6 * generalFactor)}px`,
@@ -836,13 +975,34 @@ export const TranslatedTextOverlay: VFC<{
                 </div>
             )}
 
+            {/* Controller hint while a box is picked with the D-pad */}
+            {!lookup && selectedIndex !== null && !loading && translationsVisible && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: '20px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(0, 0, 0, 0.75)',
+                    color: '#fff',
+                    padding: '5px 14px',
+                    borderRadius: '14px',
+                    fontSize: '13px',
+                    zIndex: 7003,
+                    pointerEvents: 'none',
+                }}>
+                    A look up · D-pad choose box · B clear
+                </div>
+            )}
+
             {/* Dictionary popup for the tapped box */}
             {lookup && regions[lookup.index] && (
                 <DictionaryPopup
                     key={lookup.key}
+                    ref={popupRef}
                     text={regions[lookup.index].text}
                     initialOffset={lookup.offset}
                     side={lookup.side}
+                    showControllerHints={lookup.viaController && (navSource?.isControllerNavigationEnabled() ?? false)}
                     onClose={() => setLookup(null)}
                     onSendText={onSendRegion}
                 />
@@ -991,6 +1151,7 @@ export const ImageOverlay: VFC<{ state: ImageState, onDismiss: () => void, onSen
             translatedTextFontStyle={translatedTextFontStyle}
             onSendToPhone={onSendToPhone}
             onSendRegion={onSendRegion}
+            navSource={state}
         />
     );
 };

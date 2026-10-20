@@ -365,6 +365,14 @@ export const TabControls: VFC<TabControlsProps> = ({ inputDiagnostics }) => {
             <PanelSection title="Behavior">
                 <PanelSectionRow>
                     <ToggleField
+                        checked={settings.overlayControllerNavigation}
+                        label="Controller Navigation"
+                        description={<>On the overlay, the D-pad picks a text box and A opens the dictionary. In the dictionary, ◀▶ move by character, L1/R1 by word, ▲▼ pick an entry, X sends the text, Y sends the word, B goes back.<br /><br />Turn off if the game reacts to these buttons while the overlay is open.</>}
+                        onChange={(value) => updateSetting('overlayControllerNavigation', value, 'Controller navigation')}
+                    />
+                </PanelSectionRow>
+                <PanelSectionRow>
+                    <ToggleField
                         checked={settings.pauseGameOnOverlay}
                         label="Pause Game While Translating"
                         description={<>Pauses the active game and allows you to read the text more thoughtfully. The game is resumed when overlay is dismissed.<br /><br />Doesn't work well with game streaming (moonlight, geforce now, remote play, etc)</>}

@@ -5,8 +5,9 @@
 // phone (ntfy) lives here as explicit buttons so lookups never send by accident.
 
 import { call } from "@decky/api";
-import { CSSProperties, VFC, useCallback, useEffect, useRef, useState } from "react";
+import { CSSProperties, VFC, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { logger } from "../Logger";
+import type { NavButton } from "../Input";
 import { Glossary, glossaryToText } from "./StructuredContent";
 import { DictionaryDefinition, DictionaryEntry, DictionaryJobStatus, DictionaryTag, LookupResult } from "./types";
 
@@ -111,15 +112,22 @@ function entryToText(entry: DictionaryEntry, sentence: string): string {
 
 const EntryView: VFC<{
     entry: DictionaryEntry;
+    selected: boolean;
+    elementRef: (el: HTMLDivElement | null) => void;
     onLookupTerm: (term: string) => void;
     onSendWord: (entry: DictionaryEntry) => void;
-}> = ({ entry, onLookupTerm, onSendWord }) => {
+}> = ({ entry, selected, elementRef, onLookupTerm, onSendWord }) => {
     const [showForms, setShowForms] = useState(false);
     const groups = groupByDictionary(entry.definitions.filter(d => !d.isForms));
     const forms = entry.definitions.filter(d => d.isForms);
 
     return (
-        <div style={{ padding: '10px 4px 12px', borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+        <div ref={elementRef} style={{
+            padding: '10px 4px 12px 8px',
+            borderBottom: '1px solid rgba(255,255,255,0.12)',
+            borderLeft: selected ? '3px solid #4fc3f7' : '3px solid transparent',
+            background: selected ? 'rgba(79, 195, 247, 0.07)' : undefined,
+        }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px' }}>
                 <div style={{ minWidth: 0 }}>
                     <Headword entry={entry} />
@@ -194,13 +202,30 @@ const EntryView: VFC<{
     );
 };
 
-export const DictionaryPopup: VFC<{
+// Lets the overlay forward controller buttons while the popup is open
+export interface DictionaryPopupHandle {
+    handleNav: (button: NavButton) => void;
+}
+
+interface DictionaryPopupProps {
     text: string;
     initialOffset: number;
     side: 'left' | 'right';
+    showControllerHints?: boolean;
     onClose: () => void;
     onSendText: (text: string) => void;
-}> = ({ text, initialOffset, side, onClose, onSendText }) => {
+}
+
+const HintKey: VFC<{ label: string }> = ({ label }) => (
+    <span style={{
+        display: 'inline-block', minWidth: '16px', padding: '0 4px', marginRight: '3px', borderRadius: '8px',
+        background: 'rgba(255,255,255,0.18)', textAlign: 'center', fontWeight: 'bold',
+    }}>{label}</span>
+);
+
+export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopupProps>(({
+    text, initialOffset, side, showControllerHints = false, onClose, onSendText,
+}, ref) => {
     const [history, setHistory] = useState<HistoryItem[]>([{ kind: 'scan', offset: initialOffset }]);
     const [result, setResult] = useState<LookupResult | null>(null);
     const [loading, setLoading] = useState(false);
@@ -208,7 +233,16 @@ export const DictionaryPopup: VFC<{
     const requestId = useRef(0);
     const scrollRef = useRef<HTMLDivElement>(null);
 
+    // Controller state: highlighted entry (Y sends it) and the word-jump trail for L1
+    const [selectedEntry, setSelectedEntry] = useState(0);
+    const [controllerActive, setControllerActive] = useState(showControllerHints);
+    const entryRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const wordTrail = useRef<number[]>([]);
+    const lastScanOffset = useRef(initialOffset);
+
     const current = history[history.length - 1];
+    if (current.kind === 'scan') lastScanOffset.current = current.offset;
+    const chars = useMemo(() => Array.from(text), [text]);
 
     const runLookup = useCallback(async (item: HistoryItem) => {
         const id = ++requestId.current;
@@ -219,6 +253,7 @@ export const DictionaryPopup: VFC<{
                 : await call<[string, number], LookupResult>('dictionary_lookup', item.term, 0);
             if (id !== requestId.current) return;
             setResult(res);
+            setSelectedEntry(0);
             if (scrollRef.current) scrollRef.current.scrollTop = 0;
             logger.debug('Dictionary', `Lookup took ${res?.elapsedMs}ms, ${res?.entries?.length ?? 0} entries`);
         } catch (e) {
@@ -273,6 +308,81 @@ export const DictionaryPopup: VFC<{
     const entries = result?.entries || [];
     const noDictionaries = result?.success && result.hasDictionaries === false;
 
+    // Next character index in direction dir starting at start, skipping
+    // whitespace and punctuation (nothing to look up at 、 or 「)
+    const stepFrom = (start: number, dir: 1 | -1): number | null => {
+        for (let i = start; i >= 0 && i < chars.length; i += dir) {
+            if (!/[\s\p{P}\p{S}]/u.test(chars[i])) return i;
+        }
+        return null;
+    };
+
+    const selectEntry = (index: number) => {
+        const next = Math.max(0, Math.min(entries.length - 1, index));
+        setSelectedEntry(next);
+        if (next === 0 && scrollRef.current) scrollRef.current.scrollTop = 0;
+        else entryRefs.current[next]?.scrollIntoView({ block: 'nearest' });
+    };
+
+    const navRef = useRef<(button: NavButton) => void>(() => {});
+    navRef.current = (button: NavButton) => {
+        setControllerActive(true);
+        const base = current.kind === 'scan' ? current.offset : lastScanOffset.current;
+        switch (button) {
+            case 'left':
+            case 'right': {
+                const i = stepFrom(base + (button === 'right' ? 1 : -1), button === 'right' ? 1 : -1);
+                if (i !== null) {
+                    wordTrail.current = [];
+                    scanAt(i);
+                }
+                break;
+            }
+            case 'r1': {
+                // Jump past the highlighted word
+                const end = current.kind === 'scan' && result && result.matchEnd > result.matchStart
+                    ? result.matchEnd : base + 1;
+                const i = stepFrom(end, 1);
+                if (i !== null) {
+                    wordTrail.current.push(base);
+                    scanAt(i);
+                }
+                break;
+            }
+            case 'l1': {
+                const previous = wordTrail.current.pop();
+                const i = previous !== undefined ? previous : stepFrom(base - 1, -1);
+                if (i !== null) scanAt(i);
+                break;
+            }
+            case 'up':
+            case 'down':
+                if (entries.length > 0) {
+                    selectEntry(selectedEntry + (button === 'down' ? 1 : -1));
+                } else if (scrollRef.current) {
+                    scrollRef.current.scrollTop += button === 'down' ? 120 : -120;
+                }
+                break;
+            case 'x':
+                onSendText(text);
+                break;
+            case 'y':
+                if (entries[selectedEntry]) onSendText(entryToText(entries[selectedEntry], text));
+                break;
+            case 'a':
+                if (noDictionaries && !installStatus) installRecommended();
+                break;
+            case 'b':
+                if (history.length > 1) goBack();
+                else onClose();
+                break;
+        }
+    };
+
+    useImperativeHandle(ref, () => ({
+        handleNav: (button: NavButton) => navRef.current(button),
+    }), []);
+
     return (
         <div
             onClick={(e) => e.stopPropagation()}
@@ -317,7 +427,7 @@ export const DictionaryPopup: VFC<{
                     return (
                         <span
                             key={i}
-                            onClick={() => scanAt(i)}
+                            onClick={() => { wordTrail.current = []; scanAt(i); }}
                             style={{
                                 cursor: 'pointer',
                                 borderRadius: '3px',
@@ -386,12 +496,36 @@ export const DictionaryPopup: VFC<{
                         <EntryView
                             key={`${entry.term}|${entry.reading}|${i}`}
                             entry={entry}
+                            selected={controllerActive && i === selectedEntry}
+                            elementRef={(el) => { entryRefs.current[i] = el; }}
                             onLookupTerm={lookupTerm}
                             onSendWord={(e) => onSendText(entryToText(e, text))}
                         />
                     ))
                 )}
             </div>
+
+            {/* Controller hints */}
+            {controllerActive && (
+                <div style={{
+                    flexShrink: 0,
+                    padding: '6px 12px',
+                    fontSize: '11px',
+                    lineHeight: '18px',
+                    opacity: 0.75,
+                    borderTop: '1px solid rgba(255,255,255,0.12)',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    columnGap: '10px',
+                }}>
+                    <span><HintKey label="◀▶" />character</span>
+                    <span><HintKey label="L1" /><HintKey label="R1" />word</span>
+                    <span><HintKey label="▲▼" />entry</span>
+                    <span><HintKey label="X" />send text</span>
+                    <span><HintKey label="Y" />send word</span>
+                    <span><HintKey label="B" />{history.length > 1 ? 'back' : 'close'}</span>
+                </div>
+            )}
         </div>
     );
-};
+});

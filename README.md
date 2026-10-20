@@ -62,6 +62,28 @@ Tap any text box on the overlay to look up the Japanese words in it, Yomitan sty
 - The Dictionary tab installs the recommended dictionaries in one step (JMdict, JMnedict and Jiten frequency, about 35 MB to download and 215 MB on disk), or any Yomitan-format dictionary from a .zip file or URL.
 - Dictionaries can be reordered, disabled, deleted and updated. Updatable dictionaries are checked automatically (weekly by default).
 
+With a controller (can be turned off under Controls → Controller Navigation):
+
+| Where | Button | Action |
+|-------|--------|--------|
+| Overlay | D-pad | Pick a text box |
+| Overlay | A | Open the dictionary for the picked box |
+| Overlay | B | Clear the selection |
+| Dictionary | ◀ ▶ | Move the lookup one character |
+| Dictionary | L1 / R1 | Previous / next word |
+| Dictionary | ▲ ▼ | Pick an entry |
+| Dictionary | X | Send the box's text to your phone |
+| Dictionary | Y | Send the picked entry (word, reading, definitions and sentence) |
+| Dictionary | B | Back after following a cross-reference, otherwise close |
+
+## Updating a Deck from a PC (no Desktop Mode)
+
+`tools/deploy-to-deck.sh` builds the plugin and copies its code to the Deck over SSH, keeping the dependencies that are already installed there. Decky reloads the plugin automatically, so the Deck can stay in Game Mode. It needs SSH enabled on the Deck once (see the script header) and the plugin installed once by the normal route.
+
+```bash
+tools/deploy-to-deck.sh steamdeck.local
+```
+
 ## How does it do that? 
 
 Decky Translator allows you to choose different Text Recognition and Translation methods - feel free to experiment.

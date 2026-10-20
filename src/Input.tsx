@@ -59,6 +59,22 @@ export interface ProgressInfo {
     forDismiss: boolean;
 }
 
+// Buttons used to navigate the overlay and dictionary popup
+export type NavButton = 'up' | 'down' | 'left' | 'right' | 'a' | 'b' | 'x' | 'y' | 'l1' | 'r1';
+
+const NAV_BUTTON_MAP: Record<string, NavButton> = {
+    'DPAD_UP': 'up',
+    'DPAD_DOWN': 'down',
+    'DPAD_LEFT': 'left',
+    'DPAD_RIGHT': 'right',
+    'A': 'a',
+    'B': 'b',
+    'X': 'x',
+    'Y': 'y',
+    'L1': 'l1',
+    'R1': 'r1',
+};
+
 // Mapping from hidraw button names to Button enum
 const HIDRAW_BUTTON_MAP: Record<string, Button> = {
     'A': Button.A,
@@ -134,6 +150,12 @@ export class Input {
     // Track currently pressed buttons (using Button enum values now)
     private currentlyPressedButtons: Set<Button> = new Set();
 
+    // Overlay navigation: press counts from the last poll, diffed to find taps
+    private navListeners: Array<(button: NavButton) => void> = [];
+    private navEnabled = true;
+    private lastPressCounts: Record<string, number> | null = null;
+    private lastPressedNames: Set<string> = new Set();
+
     constructor() {
         logger.info('Input', 'Initializing with hidraw-based detection');
         this.startHidrawPolling();
@@ -158,10 +180,11 @@ export class Input {
         if (!this.enabled) return;
 
         try {
-            const result = await call<[], { success: boolean; buttons: string[] }>('get_hidraw_button_state');
+            const result = await call<[], { success: boolean; buttons: string[]; presses?: Record<string, number> }>('get_hidraw_button_state');
 
             if (result && result.success && result.buttons) {
                 this.handleButtonState(result.buttons);
+                this.handleNavPresses(result.buttons, result.presses);
             }
         } catch (error) {
             // Silently handle polling errors to avoid log spam
@@ -200,6 +223,53 @@ export class Input {
             // Process the new state
             this.processButtonState();
         }
+    }
+
+    // Emits a nav event for every D-pad/face/shoulder press since the last poll.
+    // Press counts catch taps shorter than the poll interval; older backends
+    // without counts fall back to comparing held-button snapshots.
+    private handleNavPresses(buttonNames: string[], presses?: Record<string, number>): void {
+        const pressed: NavButton[] = [];
+
+        if (presses) {
+            const previous = this.lastPressCounts;
+            this.lastPressCounts = { ...presses };
+            if (previous) {
+                for (const [name, count] of Object.entries(presses)) {
+                    const nav = NAV_BUTTON_MAP[name];
+                    if (!nav) continue;
+                    // A drop means the monitor restarted; just take the new baseline
+                    const delta = count - (previous[name] ?? 0);
+                    for (let i = 0; i < Math.min(delta, 3); i++) pressed.push(nav);
+                }
+            }
+        } else {
+            for (const name of buttonNames) {
+                const nav = NAV_BUTTON_MAP[name];
+                if (nav && !this.lastPressedNames.has(name)) pressed.push(nav);
+            }
+        }
+        this.lastPressedNames = new Set(buttonNames);
+
+        if (!this.enabled || !this.navEnabled || !this.overlayVisible || pressed.length === 0) return;
+        for (const nav of pressed) {
+            logger.debug('Input', `Nav button: ${nav}`);
+            this.navListeners.forEach(cb => cb(nav));
+        }
+    }
+
+    setNavEnabled(enabled: boolean): void {
+        logger.info('Input', `Overlay controller navigation ${enabled ? 'enabled' : 'disabled'}`);
+        this.navEnabled = enabled;
+    }
+
+    onNavButton(callback: (button: NavButton) => void): void {
+        this.navListeners.push(callback);
+    }
+
+    offNavButton(callback: (button: NavButton) => void): void {
+        const idx = this.navListeners.indexOf(callback);
+        if (idx !== -1) this.navListeners.splice(idx, 1);
     }
 
     // Check if the button set has changed

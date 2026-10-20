@@ -284,6 +284,9 @@ class HidrawButtonMonitor:
         self.thread = None
         self.event_queue = queue.Queue(maxsize=100)
         self.current_buttons = set()
+        # Monotonic per-button press counts, so pollers can see taps that
+        # start and end between two polls without consuming shared events
+        self.press_counts = {}
         self.last_buttons_l = 0
         self.last_buttons_h = 0
         self.error_count = 0
@@ -579,6 +582,7 @@ class HidrawButtonMonitor:
 
             # Buttons that were pressed
             for button in new_buttons - self.current_buttons:
+                self.press_counts[button] = self.press_counts.get(button, 0) + 1
                 event = {
                     "button": button,
                     "pressed": True,
@@ -614,6 +618,10 @@ class HidrawButtonMonitor:
         """Get the current complete button state (all currently pressed buttons)."""
         with self.lock:
             return list(self.current_buttons)
+
+    def get_press_counts(self):
+        with self.lock:
+            return dict(self.press_counts)
 
     def get_status(self):
         """Get monitor status for diagnostics."""
@@ -655,6 +663,7 @@ class TritonHidrawMonitor:
         self.thread = None
         self.event_queue = queue.Queue(maxsize=100)
         self.current_buttons = set()
+        self.press_counts = {}
         self.last_buttons = 0
         self.error_count = 0
         self.initialized = False
@@ -789,6 +798,7 @@ class TritonHidrawMonitor:
                     except Exception:
                         pass
             for button in new_buttons - self.current_buttons:
+                self.press_counts[button] = self.press_counts.get(button, 0) + 1
                 event = {"button": button, "pressed": True, "timestamp": timestamp}
                 try:
                     self.event_queue.put_nowait(event)
@@ -815,6 +825,10 @@ class TritonHidrawMonitor:
     def get_button_state(self):
         with self.lock:
             return list(self.current_buttons)
+
+    def get_press_counts(self):
+        with self.lock:
+            return dict(self.press_counts)
 
     def get_status(self):
         with self.lock:
@@ -868,6 +882,16 @@ class EvdevGamepadMonitor:
         316: 'STEAM',   # BTN_MODE
         317: 'L3',      # BTN_THUMBL
         318: 'R3',      # BTN_THUMBR
+        544: 'DPAD_UP',     # BTN_DPAD_UP
+        545: 'DPAD_DOWN',   # BTN_DPAD_DOWN
+        546: 'DPAD_LEFT',   # BTN_DPAD_LEFT
+        547: 'DPAD_RIGHT',  # BTN_DPAD_RIGHT
+    }
+
+    # Most gamepads report the d-pad as a hat: ABS_HAT0X / ABS_HAT0Y
+    HAT_AXES = {
+        16: ('DPAD_LEFT', 'DPAD_RIGHT'),
+        17: ('DPAD_UP', 'DPAD_DOWN'),
     }
 
     def __init__(self):
@@ -878,6 +902,7 @@ class EvdevGamepadMonitor:
         self._rejected_paths = set()  # paths we already checked and dismissed
         self._last_cache_clear = 0
         self.current_buttons = set()
+        self.press_counts = {}
         self.lock = threading.Lock()
         self.last_scan_time = 0
         logger.debug("EvdevGamepadMonitor initialized")
@@ -997,9 +1022,20 @@ class EvdevGamepadMonitor:
                             if name is not None:
                                 with self.lock:
                                     if event.value == 1:  # pressed
+                                        if name not in self.current_buttons:
+                                            self.press_counts[name] = self.press_counts.get(name, 0) + 1
                                         self.current_buttons.add(name)
                                     elif event.value == 0:  # released
                                         self.current_buttons.discard(name)
+                        elif event.type == 3 and event.code in self.HAT_AXES:  # EV_ABS hat
+                            negative, positive = self.HAT_AXES[event.code]
+                            with self.lock:
+                                self.current_buttons.discard(negative)
+                                self.current_buttons.discard(positive)
+                                if event.value != 0:
+                                    name = negative if event.value < 0 else positive
+                                    self.press_counts[name] = self.press_counts.get(name, 0) + 1
+                                    self.current_buttons.add(name)
                 except OSError:
                     logger.info(f"EvdevGamepadMonitor: device disconnected (fd={fd})")
                     self._remove_device(fd)
@@ -1042,6 +1078,10 @@ class EvdevGamepadMonitor:
     def get_button_state(self):
         with self.lock:
             return list(self.current_buttons)
+
+    def get_press_counts(self):
+        with self.lock:
+            return dict(self.press_counts)
 
     def get_status(self):
         with self.lock:
@@ -1502,6 +1542,8 @@ class Plugin:
                 pass  # persisted below, read fresh in send_ntfy_notification
             elif key == "dictionary_auto_update_days":
                 pass  # persisted below, read at startup
+            elif key == "overlay_controller_navigation":
+                pass  # persisted below, used by the frontend only
             else:
                 logger.warning(f"Unknown setting key: {key}")
 
@@ -1551,6 +1593,7 @@ class Plugin:
                 "ntfy_topic": self._settings.get_setting("ntfy_topic", ""),
                 "ntfy_token": self._settings.get_setting("ntfy_token", ""),
                 "dictionary_auto_update_days": self._settings.get_setting("dictionary_auto_update_days", 7),
+                "overlay_controller_navigation": self._settings.get_setting("overlay_controller_navigation", True),
             }
             return settings
         except Exception as e:
@@ -2604,26 +2647,24 @@ class Plugin:
         """Get the current complete button state from both monitors.
 
         Merges button state from hidraw (built-in controller) and evdev
-        (external gamepads) via set union.
+        (external gamepads) via set union. "presses" holds per-button press
+        counts summed across monitors; they only ever grow (until a monitor is
+        recreated), so a poller can diff them to catch quick taps.
         """
         try:
             buttons = set()
+            presses = {}
             any_running = False
 
-            if self._hidraw_monitor and self._hidraw_monitor.running:
-                any_running = True
-                buttons.update(self._hidraw_monitor.get_button_state())
-
-            if self._evdev_monitor and self._evdev_monitor.running:
-                any_running = True
-                buttons.update(self._evdev_monitor.get_button_state())
-
-            if self._triton_monitor and self._triton_monitor.running:
-                any_running = True
-                buttons.update(self._triton_monitor.get_button_state())
+            for monitor in (self._hidraw_monitor, self._evdev_monitor, self._triton_monitor):
+                if monitor and monitor.running:
+                    any_running = True
+                    buttons.update(monitor.get_button_state())
+                    for name, count in monitor.get_press_counts().items():
+                        presses[name] = presses.get(name, 0) + count
 
             if any_running:
-                return {"success": True, "buttons": list(buttons)}
+                return {"success": True, "buttons": list(buttons), "presses": presses}
             return {"success": False, "buttons": [], "error": "Monitor not running"}
         except Exception as e:
             logger.error(f"Error getting hidraw button state: {e}")

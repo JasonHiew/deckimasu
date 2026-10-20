@@ -43,6 +43,7 @@ export interface Settings {
     ntfyTopic: string; // ntfy topic name
     ntfyToken: string; // ntfy access token, if the topic requires auth
     dictionaryAutoUpdateDays: number; // Days between automatic dictionary update checks (0 = never)
+    overlayControllerNavigation: boolean; // D-pad/face buttons drive the overlay and dictionary popup
 }
 
 // Define action types
@@ -89,6 +90,7 @@ const initialSettings: Settings = {
     ntfyTopic: "",
     ntfyToken: "",
     dictionaryAutoUpdateDays: 7,
+    overlayControllerNavigation: true,
 };
 
 // Create the reducer
@@ -170,6 +172,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                     ntfyTopic: serverSettings.ntfy_topic || "",
                     ntfyToken: serverSettings.ntfy_token || "",
                     dictionaryAutoUpdateDays: serverSettings.dictionary_auto_update_days ?? 7,
+                    overlayControllerNavigation: serverSettings.overlay_controller_navigation ?? true,
                 };
 
                 // Update settings in context
@@ -200,6 +203,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                 logic.setTranslatedTextFontStyle(serverSettings.translated_text_font_style ?? 'normal');
                 logic.setHideIdenticalTranslations(serverSettings.hide_identical_translations ?? false);
                 logic.setAllowLabelGrowth(serverSettings.allow_label_growth ?? false);
+                logic.setOverlayControllerNavigation(serverSettings.overlay_controller_navigation ?? true);
 
                 logger.info('SettingsContext', 'All settings loaded successfully');
                 logger.logObject('SettingsContext', 'Settings', mappedSettings);
@@ -256,7 +260,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                 ntfyServerUrl: 'ntfy_server_url',
                 ntfyTopic: 'ntfy_topic',
                 ntfyToken: 'ntfy_token',
-                dictionaryAutoUpdateDays: 'dictionary_auto_update_days'
+                dictionaryAutoUpdateDays: 'dictionary_auto_update_days',
+                overlayControllerNavigation: 'overlay_controller_navigation'
             };
 
             // Skip settings that don't need to be saved to backend
@@ -316,6 +321,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                     break;
                 case 'allowLabelGrowth':
                     logic.setAllowLabelGrowth(value);
+                    break;
+                case 'overlayControllerNavigation':
+                    logic.setOverlayControllerNavigation(value);
                     break;
                 case 'ocrProvider':
                     logic.setOcrProvider(value);

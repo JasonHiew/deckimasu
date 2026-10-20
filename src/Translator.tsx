@@ -96,6 +96,11 @@ export class GameTranslatorLogic {
             }
         });
 
+        // D-pad / face button taps drive the overlay and dictionary popup
+        this.shortcutInput.onNavButton((button) => {
+            if (this.enabled) this.imageState.emitNav(button);
+        });
+
         // Set up progress listener
         this.shortcutInput.onProgress((progressInfo: ProgressInfo) => {
             this.notifyProgressListeners(progressInfo);
@@ -193,6 +198,11 @@ export class GameTranslatorLogic {
 
     setHideIdenticalTranslations = (enabled: boolean): void => {
         this.hideIdenticalTranslations = enabled;
+    }
+
+    setOverlayControllerNavigation = (enabled: boolean): void => {
+        this.shortcutInput.setNavEnabled(enabled);
+        this.imageState.setControllerNavigation(enabled);
     }
 
     setPauseGameOnOverlay = (enabled: boolean): void => {
