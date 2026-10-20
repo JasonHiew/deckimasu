@@ -76,6 +76,18 @@ With a controller (can be turned off under Controls → Controller Navigation):
 | Dictionary | Y | Send the picked entry's word (dictionary form only) |
 | Dictionary | B | Back after following a cross-reference, otherwise close |
 
+### Looking words up on an iPhone (Shirabe Jisho)
+
+Word notifications are meant to be looked up in a phone dictionary such as [Shirabe Jisho](https://apps.apple.com/app/id1005203380). There are three ways to get the word into it:
+
+1. **Tap the notification.** The Word link (Controls → Configure ntfy) is `shirabelookup://search?w={word}` by default. That's Shirabe's lookup link, documented in its 1.8 release notes, and ntfy opens it when the notification is tapped. Shirabe's "search clipboard on open" setting can win over the link and search the clipboard instead. That depends on how Shirabe was opened, and it may not happen at all.
+2. **Tap the notification, through a Shortcut.** If the clipboard keeps winning, pick the "Shirabe via Shortcut" preset. It runs an iOS Shortcut named `Shirabe` that receives text and does two things: **Copy to Clipboard** (Shortcut Input), then **Open URLs** `shirabelookup://search?w=` + Shortcut Input. Clipboard search and the link then agree, so clipboard search can stay on for your other OCR apps.
+3. **No tap: open Shirabe as soon as the notification arrives** (iOS 27 notification automations). In Shortcuts → Automation, add "When I receive a notification from ntfy". Turn **Automation** on and **Notify** off, so it runs without asking. Then add **Open URLs** `shirabelookup://search?w=` followed by the notification's **Body**:
+
+   <img src="assets/docs/ios-shirabe-automation.png" alt="iOS Shortcuts automation: when a notification from ntfy arrives, open shirabelookup://search?w= followed by the notification body" width="320">
+
+   This runs for every ntfy notification, including "Send to phone" sentences, so add a filter (Add Filter) if those go to the same topic. Opening an app from an automation may only work while the phone is unlocked.
+
 ## Updating a Deck from a PC (no Desktop Mode)
 
 `tools/deploy-to-deck.sh` builds the plugin and copies its code to the Deck over SSH, keeping the dependencies that are already installed there. Decky reloads the plugin automatically, so the Deck can stay in Game Mode. It needs SSH enabled on the Deck once (see the script header) and the plugin installed once by the normal route.
