@@ -84,6 +84,8 @@ With a controller (can be turned off under Controls → Controller Navigation):
 tools/deploy-to-deck.sh steamdeck.local
 ```
 
+From cmd or PowerShell on Windows, `tools\deploy-to-deck.cmd steamdeck.local` runs the same script through Git Bash.
+
 ## How does it do that? 
 
 Decky Translator allows you to choose different Text Recognition and Translation methods - feel free to experiment.
