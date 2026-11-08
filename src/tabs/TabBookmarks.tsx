@@ -101,7 +101,8 @@ export const TabBookmarks: VFC = () => {
     const shown = hideDone ? all.filter(b => !b.done) : all;
 
     return (
-        <div>
+        // Bottom room so the last row is not hidden behind Steam's button-hint footer
+        <div style={{ paddingBottom: "64px" }}>
             <style>{`.dt-bm-focus { background: rgba(103,160,255,0.22) !important; }`}</style>
             <PanelSection title={`Bookmarks${bookmarks ? ` (${all.length})` : ""}`}>
                 <PanelSectionRow>
@@ -162,7 +163,8 @@ export const TabBookmarks: VFC = () => {
                         <Focusable
                             key={b.id}
                             focusWithinClassName="dt-bm-focus"
-                            style={{ display: "flex", alignItems: "center", gap: "4px", padding: "4px 4px 4px 8px", borderRadius: "4px", background: "rgba(255,255,255,0.04)", opacity: b.done ? 0.55 : 1 }}
+                            // scrollMarginBottom keeps a focused row clear of the footer when the list scrolls to it
+                            style={{ display: "flex", alignItems: "center", gap: "4px", padding: "4px 4px 4px 8px", borderRadius: "4px", background: "rgba(255,255,255,0.04)", opacity: b.done ? 0.55 : 1, scrollMarginBottom: "64px" }}
                         >
                             <Focusable
                                 onActivate={() => open(b)}
