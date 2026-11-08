@@ -70,8 +70,8 @@ With a controller (can be turned off under Controls → Controller Navigation). 
 | Overlay | A | Open the dictionary for the picked box |
 | Overlay | L1 / R1 | Switch the boxes between original and translated text |
 | Overlay | B | Clear the selection |
-| Dictionary | ◀ ▶ (D-pad or stick) | Move the lookup one character |
-| Dictionary | L1 / R1 | Previous / next word |
+| Dictionary | ◀ ▶ (D-pad or stick) | Previous / next word |
+| Dictionary | L1 / R1 | Move the lookup one character |
 | Dictionary | ▲ ▼ (D-pad or stick) | Pick an entry |
 | Dictionary | X | Send the box's text to your phone |
 | Dictionary | Y | Send the picked entry's word (dictionary form only) |

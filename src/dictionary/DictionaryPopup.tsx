@@ -222,7 +222,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
     const requestId = useRef(0);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Controller state: highlighted entry (Y sends it) and the word-jump trail for L1
+    // Controller state: highlighted entry (Y sends it) and the word-jump trail for ◀
     const [selectedEntry, setSelectedEntry] = useState(0);
     const [controllerActive, setControllerActive] = useState(showControllerHints);
     const entryRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -318,16 +318,17 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
         setControllerActive(true);
         const base = current.kind === 'scan' ? current.offset : lastScanOffset.current;
         switch (button) {
-            case 'left':
-            case 'right': {
-                const i = stepFrom(base + (button === 'right' ? 1 : -1), button === 'right' ? 1 : -1);
+            // L1/R1 move one character, the D-pad / sticks move one word
+            case 'l1':
+            case 'r1': {
+                const i = stepFrom(base + (button === 'r1' ? 1 : -1), button === 'r1' ? 1 : -1);
                 if (i !== null) {
                     wordTrail.current = [];
                     scanAt(i);
                 }
                 break;
             }
-            case 'r1': {
+            case 'right': {
                 // Jump past the highlighted word
                 const end = current.kind === 'scan' && result && result.matchEnd > result.matchStart
                     ? result.matchEnd : base + 1;
@@ -338,7 +339,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                 }
                 break;
             }
-            case 'l1': {
+            case 'left': {
                 const previous = wordTrail.current.pop();
                 const i = previous !== undefined ? previous : stepFrom(base - 1, -1);
                 if (i !== null) scanAt(i);
@@ -507,8 +508,8 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                     flexWrap: 'wrap',
                     columnGap: '10px',
                 }}>
-                    <span><HintKey label="◀▶" />character</span>
-                    <span><HintKey label="L1" /><HintKey label="R1" />word</span>
+                    <span><HintKey label="◀▶" />word</span>
+                    <span><HintKey label="L1" /><HintKey label="R1" />character</span>
                     <span><HintKey label="▲▼" />entry</span>
                     <span><HintKey label="X" />send text</span>
                     <span><HintKey label="Y" />send word</span>
