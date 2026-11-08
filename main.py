@@ -93,6 +93,7 @@ import requests
 from providers import ProviderManager, TextRegion, NetworkError, ApiKeyError, RateLimitError
 from providers.translation_cache import TranslationCache, PROVIDER_TIERS, normalize
 from providers.ntfy_provider import NtfyProvider
+from providers.bookmarks import BookmarkStore
 from providers.dictionary.manager import DictionaryManager, ATTRIBUTION as DICTIONARY_ATTRIBUTION
 
 _processing_lock = False
@@ -1337,6 +1338,7 @@ class Plugin:
 
     # Dictionary lookup (Yomitan-format dictionaries)
     _dictionary_manager: DictionaryManager = None
+    _bookmarks: BookmarkStore = None
 
     # OCR API configurations - user must provide their own API key
     _google_vision_api_key: str = ""
@@ -2627,6 +2629,38 @@ class Plugin:
         return await self._dictionary_action(
             "clear message", lambda: self._dictionary_manager.clear_last_error())
 
+    # Bookmarks: dictionary words saved to look up later
+
+    async def _bookmark_action(self, name, fn):
+        if not self._bookmarks:
+            return {"success": False, "error": "unavailable", "message": "Bookmarks are unavailable"}
+        try:
+            return {"success": True, "result": await asyncio.to_thread(fn)}
+        except Exception as e:
+            logger.error(f"Bookmark {name} failed: {e}")
+            return {"success": False, "error": "bookmark_error", "message": str(e)}
+
+    async def bookmark_list(self):
+        return await self._bookmark_action("list", lambda: self._bookmarks.list())
+
+    async def bookmark_add(self, term: str, reading: str = "", context: str = "", context_offset: int = 0):
+        return await self._bookmark_action(
+            "add", lambda: self._bookmarks.add(term, reading, context, context_offset))
+
+    async def bookmark_update(self, bookmark_id: int, note=None, done=None):
+        return await self._bookmark_action(
+            "update", lambda: self._bookmarks.update(bookmark_id, note=note, done=done))
+
+    async def bookmark_delete(self, bookmark_id: int):
+        return await self._bookmark_action("delete", lambda: self._bookmarks.delete(bookmark_id))
+
+    async def bookmark_delete_term(self, term: str, reading: str = ""):
+        return await self._bookmark_action(
+            "delete term", lambda: self._bookmarks.delete_by_term(term, reading))
+
+    async def bookmark_delete_done(self):
+        return await self._bookmark_action("delete done", lambda: self._bookmarks.delete_done())
+
     async def get_enabled_state(self):
         return await self.get_setting("enabled", True)
 
@@ -3057,6 +3091,14 @@ class Plugin:
                 self._translation_cache = None
 
             try:
+                self._bookmarks = BookmarkStore(
+                    os.path.join(settingsDir, "decky-translator", "bookmarks.db")
+                )
+            except Exception as e:
+                logger.error(f"Failed to open bookmarks, continuing without them: {e}")
+                self._bookmarks = None
+
+            try:
                 self._dictionary_manager = DictionaryManager(
                     os.path.join(settingsDir, "decky-translator", "dictionaries")
                 )
@@ -3167,6 +3209,10 @@ class Plugin:
             if self._dictionary_manager:
                 self._dictionary_manager.shutdown()
                 self._dictionary_manager = None
+
+            if self._bookmarks:
+                self._bookmarks.close()
+                self._bookmarks = None
 
             if self._evdev_monitor:
                 self._evdev_monitor.stop()

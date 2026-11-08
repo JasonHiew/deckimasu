@@ -31,7 +31,7 @@ import { SettingsProvider, useSettings } from "./SettingsContext";
 import { logger } from "./Logger";
 
 // Import tab components
-import { TabMain, TabTranslation, TabControls, TabDictionary } from "./tabs";
+import { TabMain, TabTranslation, TabControls, TabDictionary, TabBookmarks } from "./tabs";
 
 // SVG Icons for tabs
 const IconTranslate = () => (
@@ -55,6 +55,12 @@ const IconGear = () => (
 const IconBook = () => (
     <svg style={{ display: "block" }} width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z" fill="currentColor"/>
+    </svg>
+);
+
+const IconBookmark = () => (
+    <svg style={{ display: "block" }} width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" fill="currentColor"/>
     </svg>
 );
 
@@ -228,6 +234,12 @@ const GameTranslator: VFC<{ logic: GameTranslatorLogic }> = ({ logic }) => {
                             title: <IconBook />,
                             content: <TabDictionary />,
                             id: "dictionary",
+                        },
+                        {
+                            // @ts-ignore
+                            title: <IconBookmark />,
+                            content: <TabBookmarks />,
+                            id: "bookmarks",
                         }
                     ]}
                 />

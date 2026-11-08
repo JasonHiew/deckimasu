@@ -19,6 +19,7 @@ import {
 import { VFC, useState, useEffect, useRef, useCallback, RefObject } from "react";
 import { call } from "@decky/api";
 import { useSettings } from "../SettingsContext";
+import { DictionaryBrowserModal } from "../dictionary/DictionaryBrowserModal";
 import { HiKey, HiLockClosed, HiInboxArrowDown, HiTrash, HiXMark, HiXCircle, HiExclamationTriangle, HiInformationCircle } from "react-icons/hi2";
 import { BsArrowRepeat, BsStars } from "react-icons/bs";
 
@@ -206,6 +207,15 @@ const CacheEntriesModal: VFC<{ closeModal?: () => void; onCleared?: () => void }
         return () => sc.removeEventListener("scroll", update);
     }, [entries, filter, page]);
 
+    // A tap can fire both onClick and onActivate; open the browser once
+    const lastOpen = useRef(0);
+    const openInDictionary = (text: string) => {
+        const now = Date.now();
+        if (now - lastOpen.current < 500) return;
+        lastOpen.current = now;
+        showModal(<DictionaryBrowserModal text={text} />);
+    };
+
     const removeEntry = async (e: any) => {
         await call<[string, string, string], any>('delete_translation_cache_entry', e.sourceLang, e.targetLang, e.source);
         setEntries(prev => prev ? prev.filter(x => !(x.sourceLang === e.sourceLang && x.targetLang === e.targetLang && x.source === e.source)) : prev);
@@ -291,7 +301,9 @@ const CacheEntriesModal: VFC<{ closeModal?: () => void; onCleared?: () => void }
                                     style={{ display: "flex", gap: "10px", alignItems: "center", paddingRight: "10px", background: "rgba(255,255,255,0.04)", borderRadius: "4px", scrollMargin: "8px" }}
                                 >
                                     <Focusable
-                                        onActivate={() => {}}
+                                        // A or a tap opens the source text in the dictionary browser
+                                        onActivate={() => openInDictionary(e.source)}
+                                        onClick={() => openInDictionary(e.source)}
                                         noFocusRing
                                         style={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: "2px", padding: "8px 0 8px 10px", scrollMargin: "8px" }}
                                     >

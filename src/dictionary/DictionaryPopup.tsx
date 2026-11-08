@@ -9,7 +9,7 @@ import { CSSProperties, VFC, forwardRef, useCallback, useEffect, useImperativeHa
 import { logger } from "../Logger";
 import type { NavButton } from "../Input";
 import { Glossary } from "./StructuredContent";
-import { DictionaryDefinition, DictionaryEntry, DictionaryJobStatus, DictionaryTag, LookupResult, progressFill } from "./types";
+import { Bookmark, DictionaryDefinition, DictionaryEntry, DictionaryJobStatus, DictionaryTag, LookupResult, bookmarkKey, progressFill } from "./types";
 
 type HistoryItem =
     | { kind: 'scan'; offset: number }
@@ -104,7 +104,9 @@ const EntryView: VFC<{
     elementRef: (el: HTMLDivElement | null) => void;
     onLookupTerm: (term: string) => void;
     onSendWord: (entry: DictionaryEntry) => void;
-}> = ({ entry, selected, elementRef, onLookupTerm, onSendWord }) => {
+    bookmarked: boolean;
+    onToggleBookmark: (entry: DictionaryEntry) => void;
+}> = ({ entry, selected, elementRef, onLookupTerm, onSendWord, bookmarked, onToggleBookmark }) => {
     const [showForms, setShowForms] = useState(false);
     const groups = groupByDictionary(entry.definitions.filter(d => !d.isForms));
     const forms = entry.definitions.filter(d => d.isForms);
@@ -123,9 +125,15 @@ const EntryView: VFC<{
                         <span lang="ja" style={{ fontSize: '16px', marginLeft: '8px', opacity: 0.8 }}>{entry.reading}</span>
                     )}
                 </div>
-                <div style={{ ...BUTTON_STYLE, padding: '4px 10px', fontSize: '12px' }}
-                     onClick={() => onSendWord(entry)}>
-                    <SendIcon size={14} /> Word
+                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    <div style={{ ...BUTTON_STYLE, padding: '4px 10px', fontSize: '12px', color: bookmarked ? '#ffc107' : '#fff' }}
+                         onClick={() => onToggleBookmark(entry)}>
+                        {bookmarked ? '★ Saved' : '☆ Save'}
+                    </div>
+                    <div style={{ ...BUTTON_STYLE, padding: '4px 10px', fontSize: '12px' }}
+                         onClick={() => onSendWord(entry)}>
+                        <SendIcon size={14} /> Word
+                    </div>
                 </div>
             </div>
 
@@ -203,6 +211,10 @@ interface DictionaryPopupProps {
     onClose: () => void;
     onSendText: (text: string) => void;
     onSendWord: (word: string) => void;
+    // Fills its parent instead of floating over the overlay (used inside modals)
+    embedded?: boolean;
+    // Called after a word is saved to or removed from the bookmarks
+    onBookmarksChanged?: () => void;
 }
 
 const HintKey: VFC<{ label: string }> = ({ label }) => (
@@ -214,6 +226,7 @@ const HintKey: VFC<{ label: string }> = ({ label }) => (
 
 export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopupProps>(({
     text, initialOffset, side, showControllerHints = false, onClose, onSendText, onSendWord,
+    embedded = false, onBookmarksChanged,
 }, ref) => {
     const [history, setHistory] = useState<HistoryItem[]>([{ kind: 'scan', offset: initialOffset }]);
     const [result, setResult] = useState<LookupResult | null>(null);
@@ -280,6 +293,40 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
     const scanAt = (offset: number) => setHistory([{ kind: 'scan', offset }]);
     const lookupTerm = (term: string) => setHistory(h => [...h, { kind: 'term', term }]);
     const goBack = () => setHistory(h => (h.length > 1 ? h.slice(0, -1) : h));
+
+    // Saved words, so each entry can show whether it is bookmarked
+    const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
+    useEffect(() => {
+        call<[], { success: boolean; result?: Bookmark[] }>('bookmark_list')
+            .then(res => { if (res?.success) setBookmarks(new Set((res.result || []).map(b => bookmarkKey(b.term, b.reading)))); })
+            .catch(e => logger.error('Dictionary', 'Failed to load bookmarks', e));
+    }, []);
+
+    const toggleBookmark = async (entry: DictionaryEntry) => {
+        const key = bookmarkKey(entry.term, entry.reading);
+        const saved = bookmarks.has(key);
+        try {
+            const res = saved
+                ? await call<[string, string], { success: boolean; message?: string }>('bookmark_delete_term', entry.term, entry.reading)
+                : await call<[string, string, string, number], { success: boolean; message?: string }>(
+                    'bookmark_add', entry.term, entry.reading,
+                    // The sentence it came from, so the bookmark reopens in context
+                    current.kind === 'scan' ? text : '',
+                    current.kind === 'scan' && result ? result.matchStart : 0);
+            if (!res?.success) {
+                logger.error('Dictionary', `Bookmark failed: ${res?.message}`);
+                return;
+            }
+            setBookmarks(prev => {
+                const next = new Set(prev);
+                if (saved) next.delete(key); else next.add(key);
+                return next;
+            });
+            onBookmarksChanged?.();
+        } catch (e) {
+            logger.error('Dictionary', 'Bookmark failed', e);
+        }
+    };
 
     const installRecommended = async () => {
         try {
@@ -360,7 +407,11 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                 if (entries[selectedEntry]) onSendWord(entries[selectedEntry].term);
                 break;
             case 'a':
-                if (noDictionaries && !installStatus) installRecommended();
+                if (noDictionaries) {
+                    if (!installStatus) installRecommended();
+                } else if (entries[selectedEntry]) {
+                    toggleBookmark(entries[selectedEntry]);
+                }
                 break;
             case 'b':
                 if (history.length > 1) goBack();
@@ -377,19 +428,16 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
         <div
             onClick={(e) => e.stopPropagation()}
             style={{
-                position: 'fixed',
-                top: '12px',
-                [side]: '12px',
-                width: 'min(600px, 48vw)',
-                maxHeight: 'calc(100vh - 24px)',
+                ...(embedded
+                    ? { position: 'relative', width: '100%', height: '100%' }
+                    : { position: 'fixed', top: '12px', [side]: '12px', width: 'min(600px, 48vw)', maxHeight: 'calc(100vh - 24px)', zIndex: 7010 }),
                 display: 'flex',
                 flexDirection: 'column',
                 background: 'rgba(22, 24, 30, 0.97)',
                 color: '#fff',
                 borderRadius: '10px',
                 border: '1px solid rgba(255,255,255,0.15)',
-                boxShadow: '0 6px 24px rgba(0,0,0,0.5)',
-                zIndex: 7010,
+                boxShadow: embedded ? undefined : '0 6px 24px rgba(0,0,0,0.5)',
                 overflow: 'hidden',
                 animation: 'dtDictFadeIn 0.15s ease-out forwards',
             } as CSSProperties}
@@ -468,7 +516,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                             <>
                                 <div>No dictionaries are installed.</div>
                                 <div style={{ opacity: 0.7, fontSize: '13px', marginBottom: '8px' }}>
-                                    JMdict, JMnedict and Jiten frequency (about 35 MB download, 215 MB on disk).
+                                    JMdict, JMnedict, Jiten frequency and アクセント辞典 pitch accents (about 35 MB download, 250 MB on disk).
                                     You can manage them in the plugin's Dictionary tab.
                                 </div>
                                 <div style={BUTTON_STYLE} onClick={installRecommended}>Install recommended dictionaries</div>
@@ -490,6 +538,8 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                             elementRef={(el) => { entryRefs.current[i] = el; }}
                             onLookupTerm={lookupTerm}
                             onSendWord={(e) => onSendWord(e.term)}
+                            bookmarked={bookmarks.has(bookmarkKey(entry.term, entry.reading))}
+                            onToggleBookmark={toggleBookmark}
                         />
                     ))
                 )}
@@ -511,6 +561,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                     <span><HintKey label="◀▶" />word</span>
                     <span><HintKey label="L1" /><HintKey label="R1" />character</span>
                     <span><HintKey label="▲▼" />entry</span>
+                    <span><HintKey label="A" />save</span>
                     <span><HintKey label="X" />send text</span>
                     <span><HintKey label="Y" />send word</span>
                     <span><HintKey label="B" />{history.length > 1 ? 'back' : 'close'}</span>

@@ -59,7 +59,9 @@ Button or Combinations can be configured in the Controls tab
 Tap any text box on the overlay to look up the Japanese words in it, Yomitan style. The popup shows the box's recognized text; tap any character to look up the longest word starting there, including conjugated forms (食べさせられなかった → 食べる). Results show readings, furigana, frequency ranks and definitions.
 
 - **Send to phone** sends the box's text via ntfy, and **Word** sends just the word in its dictionary form (行ってしまった → 行く), ready for another dictionary app. Tapping that notification opens the link set under Controls → Configure ntfy → Word link: Shirabe Jisho by default, or an iOS Shortcut that copies the word first so Shirabe's clipboard search can stay on. Tapping a box no longer sends anything by itself.
-- The Dictionary tab installs the recommended dictionaries in one step (JMdict, JMnedict and Jiten frequency, about 35 MB to download and 215 MB on disk), or any Yomitan-format dictionary from a .zip file or URL.
+- The Dictionary tab installs the recommended dictionaries in one step (JMdict, JMnedict, Jiten frequency and アクセント辞典 v2 pitch accents, about 35 MB to download and 250 MB on disk), or any Yomitan-format dictionary from a .zip file or URL. アクセント辞典 v2 ships inside the plugin, so it installs without downloading; its pitch numbers show next to each word's reading.
+- **☆ Save** (or A) bookmarks a word for later. The Bookmarks tab lists saved words: open one in the dictionary, add a note, mark it looked up, delete it, or delete all looked-up words at once. You can also type a word there to save it.
+- In Translation → View Cached Translations, tapping an entry (or pressing A) opens its original text in the dictionary.
 - Dictionaries can be reordered, disabled, deleted and updated. Updatable dictionaries are checked automatically (weekly by default).
 
 With a controller (can be turned off under Controls → Controller Navigation). The sticks work like the D-pad and repeat while held:
@@ -73,6 +75,7 @@ With a controller (can be turned off under Controls → Controller Navigation). 
 | Dictionary | ◀ ▶ (D-pad or stick) | Previous / next word |
 | Dictionary | L1 / R1 | Move the lookup one character |
 | Dictionary | ▲ ▼ (D-pad or stick) | Pick an entry |
+| Dictionary | A | Save or unsave the picked entry's word |
 | Dictionary | X | Send the box's text to your phone |
 | Dictionary | Y | Send the picked entry's word (dictionary form only) |
 | Dictionary | B | Back after following a cross-reference, otherwise close |

@@ -58,6 +58,21 @@ export interface InstalledDictionary {
     updateAvailable: boolean;
 }
 
+// A dictionary word saved to look up later
+export interface Bookmark {
+    id: number;
+    term: string;
+    reading: string;
+    context: string;
+    contextOffset: number;
+    note: string;
+    done: boolean;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export const bookmarkKey = (term: string, reading: string) => `${term}|${reading || ""}`;
+
 export interface RecommendedDictionary {
     key: string;
     name: string;
