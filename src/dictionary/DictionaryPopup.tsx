@@ -9,6 +9,7 @@ import { CSSProperties, VFC, forwardRef, useCallback, useEffect, useImperativeHa
 import { logger } from "../Logger";
 import type { NavButton } from "../Input";
 import { Glossary } from "./StructuredContent";
+import { PitchGraph } from "./PitchAccent";
 import { Bookmark, DictionaryDefinition, DictionaryEntry, DictionaryJobStatus, DictionaryTag, LookupResult, bookmarkKey, progressFill } from "./types";
 
 type HistoryItem =
@@ -110,6 +111,10 @@ const EntryView: VFC<{
     const [showForms, setShowForms] = useState(false);
     const groups = groupByDictionary(entry.definitions.filter(d => !d.isForms));
     const forms = entry.definitions.filter(d => d.isForms);
+    // Accent positions from every pitch dictionary, without repeats
+    const downsteps = Array.from(new Set(entry.pitches.flatMap(p => p.positions)
+        .map(v => (typeof v === 'number' ? v : parseInt(String(v), 10)))
+        .filter(v => Number.isInteger(v) && v >= 0)));
 
     return (
         <div ref={elementRef} style={{
@@ -147,13 +152,14 @@ const EntryView: VFC<{
                         <span style={{ background: '#1f3f5f', padding: '0 5px' }}>{f.displayValue}</span>
                     </span>
                 ))}
-                {entry.pitches.map((p, i) => (
-                    <span key={`p${i}`} style={{ fontSize: '12px', marginRight: '6px', opacity: 0.85 }}>
-                        [{p.positions.join(', ')}]
-                    </span>
-                ))}
                 {entry.termTags.map(t => <Tag key={t.name} tag={t} />)}
             </div>
+
+            {downsteps.length > 0 && (
+                <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', rowGap: '4px' }}>
+                    {downsteps.map(n => <PitchGraph key={n} reading={entry.reading} downstep={n} />)}
+                </div>
+            )}
 
             {entry.inflections.length > 0 && (
                 <div style={{ fontSize: '13px', opacity: 0.75, marginTop: '2px' }}>
