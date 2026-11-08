@@ -52,12 +52,18 @@ Tap a text box on the overlay to look its words up, with pitch accent graphs, fr
 
 ## Installation
 
-This fork is not in the Decky plugin store and has no release builds yet. Install it in two steps:
+This fork is not in the Decky plugin store. Install it from its release zip:
 
-1. **Install the original Decky Translator once**, from the Decky plugin store or from its [latest release](https://github.com/cat-in-a-box/Decky-Translator/releases/latest). This puts the plugin and its Python dependencies on the Deck.
-   - From the store: press <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/qam.svg"><img height="16" alt="QAM" src="assets/icons/dark/qam.svg"></picture>, open the Decky tab <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/plug.svg"><img height="16" alt="Decky" src="assets/icons/dark/plug.svg"></picture>, press the store icon <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/store.svg"><img height="16" alt="Store" src="assets/icons/dark/store.svg"></picture> and install "Decky Translator".
-   - From a zip: in Decky settings <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/gear.svg"><img height="16" alt="Settings" src="assets/icons/dark/gear.svg"></picture>, enable Developer Mode, then Developer → Install Plugin from ZIP file.
-2. **Deploy this fork's code over it** from a PC with [`tools/deploy-to-deck`](#updating-the-deck-from-a-pc). It replaces the plugin's code and keeps the installed dependencies.
+1. **Download [`decky-ocr-notify.zip`](https://github.com/JasonHiew/decky-ocr-notify/releases/latest/download/decky-ocr-notify.zip)** from the [latest release](https://github.com/JasonHiew/decky-ocr-notify/releases/latest). Don't unzip it.
+2. **Get it onto the Deck**, for example into Downloads: download it there with a browser in Desktop Mode, or copy it from a PC with `scp decky-ocr-notify.zip deck@<deck-ip>:~/Downloads/`.
+3. Press <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/qam.svg"><img height="16" alt="QAM" src="assets/icons/dark/qam.svg"></picture>, open the Decky tab <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/plug.svg"><img height="16" alt="Decky" src="assets/icons/dark/plug.svg"></picture> and open its settings <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/gear.svg"><img height="16" alt="Settings" src="assets/icons/dark/gear.svg"></picture>.
+4. In **General**, turn on **Developer Mode**. Then open **Developer** → **Install Plugin from ZIP file** → **Browse**, and pick `decky-ocr-notify.zip`.
+
+On first install Decky downloads the plugin's Python dependencies (about 180 MB), the same ones Decky Translator uses.
+
+- **It replaces Decky Translator.** The plugin still installs as "Decky Translator", so it takes the place of the original if you had it. Your settings carry over.
+- **Don't update it from the Decky store.** The store sees the plugin as Decky Translator and may offer the original's version as an update, which would replace this fork. To update the fork, install the newer release zip the same way.
+- To try changes from source, [deploy from a PC](#updating-the-deck-from-a-pc) instead.
 
 ## Using it
 
@@ -150,7 +156,7 @@ If Shirabe searches the clipboard instead of the word, turn off its "search clip
 
 ## Updating the Deck from a PC
 
-`tools/deploy-to-deck.sh` builds the plugin and copies its code to the Deck over SSH, keeping the dependencies already installed there. Decky reloads the plugin automatically, so the Deck can stay in Game Mode.
+`tools/deploy-to-deck.sh` builds the plugin and copies its code to the Deck over SSH, keeping the dependencies already installed there. Decky reloads the plugin automatically, so the Deck can stay in Game Mode. The plugin has to be [installed](#installation) once first, which puts its dependencies on the Deck.
 
 One-time setup on the Deck (Desktop Mode, Konsole): set a password with `passwd` and enable SSH with `sudo systemctl enable --now sshd`. The first deploy asks for the password once more to turn on hot reload for the plugin.
 
