@@ -9,7 +9,7 @@ import { CSSProperties, VFC, forwardRef, useCallback, useEffect, useImperativeHa
 import { logger } from "../Logger";
 import type { NavButton } from "../Input";
 import { Glossary } from "./StructuredContent";
-import { DictionaryDefinition, DictionaryEntry, DictionaryJobStatus, DictionaryTag, LookupResult } from "./types";
+import { DictionaryDefinition, DictionaryEntry, DictionaryJobStatus, DictionaryTag, LookupResult, progressFill } from "./types";
 
 type HistoryItem =
     | { kind: 'scan'; offset: number }
@@ -461,7 +461,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                                     {installStatus.message}{installStatus.queued > 0 ? ` (${installStatus.queued} more queued)` : ''}
                                 </div>
                                 <div style={{ height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', marginTop: '6px' }}>
-                                    <div style={{ height: '4px', width: `${Math.round((installStatus.progress || 0) * 100)}%`, background: '#3498db', borderRadius: '2px' }} />
+                                    <div style={{ height: '4px', ...progressFill(installStatus.progress), background: '#3498db', borderRadius: '2px' }} />
                                 </div>
                             </>
                         ) : (

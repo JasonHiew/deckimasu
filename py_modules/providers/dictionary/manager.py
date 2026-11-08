@@ -63,6 +63,30 @@ _HTTP_TIMEOUT = 30
 _USER_AGENT = "decky-translator-dictionary/1.0"
 
 
+_DOWNLOAD_ATTEMPTS = 3
+_RETRY_DELAY = 3  # seconds, multiplied by the attempt number
+
+
+class _TransientDownloadError(RuntimeError):
+    """A connection that failed, stalled or dropped; worth trying again."""
+
+
+def _host(url):
+    from urllib.parse import urlparse
+    return urlparse(url).hostname or url
+
+
+def _download_message(downloaded, total, speed):
+    """'Downloading 2.3 / 8.0 MB · 1.1 MB/s · 5s left', leaving out what is unknown."""
+    parts = [f"Downloading {downloaded / 1e6:.1f}" + (f" / {total / 1e6:.1f} MB" if total else " MB")]
+    if speed > 0:
+        parts.append(f"{speed / 1e6:.1f} MB/s" if speed >= 1e5 else f"{speed / 1e3:.0f} KB/s")
+        if total > downloaded:
+            left = int((total - downloaded) / speed)
+            parts.append(f"{left // 60}m {left % 60}s left" if left >= 60 else f"{left}s left")
+    return " · ".join(parts)
+
+
 class DictionaryManager:
     def __init__(self, root_dir):
         self.root_dir = root_dir
@@ -261,13 +285,19 @@ class DictionaryManager:
 
     def _http_get(self, url, stream=False):
         import requests
+        headers = {"User-Agent": _USER_AGENT}
+        if stream:
+            # Dictionary zips are already compressed. Asking for gzip makes some
+            # servers (api.jiten.moe) compress on the fly and drop Content-Length,
+            # which leaves the download with no known size or progress.
+            headers["Accept-Encoding"] = "identity"
         try:
-            resp = requests.get(url, stream=stream, timeout=_HTTP_TIMEOUT,
-                                headers={"User-Agent": _USER_AGENT})
-        except requests.ConnectionError:
-            raise RuntimeError("Cannot reach the dictionary server. Check your internet connection.")
+            resp = requests.get(url, stream=stream, timeout=_HTTP_TIMEOUT, headers=headers)
         except requests.Timeout:
-            raise RuntimeError("The dictionary server timed out.")
+            # Checked first: ConnectTimeout is also a ConnectionError
+            raise _TransientDownloadError(f"{_host(url)} timed out.")
+        except requests.ConnectionError:
+            raise _TransientDownloadError(f"Cannot reach {_host(url)}. Check your internet connection.")
         if resp.status_code != 200:
             resp.close()
             raise RuntimeError(f"HTTP {resp.status_code} from {url}")
@@ -307,25 +337,64 @@ class DictionaryManager:
         replace_id = job.get("replaceId")
         temp_path = os.path.join(self.root_dir, f"{uuid.uuid4().hex[:12]}.download")
         try:
-            resp = self._http_get(url, stream=True)
-            total = int(resp.headers.get("content-length") or 0)
-            downloaded = 0
-            with open(temp_path, "wb") as f:
-                for chunk in resp.iter_content(chunk_size=256 * 1024):
-                    if self._cancel.is_set():
-                        resp.close()
+            # A stalled or dropped connection starts the download over (servers
+            # such as api.jiten.moe do not support resuming with Range)
+            for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
+                try:
+                    self._stream_to_file(url, temp_path)
+                    break
+                except _TransientDownloadError as e:
+                    logger.warning(f"Dictionary download attempt {attempt} failed: {e}")
+                    if attempt == _DOWNLOAD_ATTEMPTS:
+                        raise RuntimeError(f"Download failed after {attempt} tries: {e}")
+                    self._set_status(phase="downloading", progress=None,
+                                     message=f"{e} Retrying ({attempt + 1}/{_DOWNLOAD_ATTEMPTS})")
+                    if self._cancel.wait(_RETRY_DELAY * attempt):
                         raise ImportCancelled()
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    self._set_status(
-                        phase="downloading",
-                        progress=(downloaded / total) if total else 0.0,
-                        message=f"Downloading {downloaded / 1e6:.1f}" + (f" / {total / 1e6:.1f} MB" if total else " MB"),
-                    )
             self._do_import(temp_path, replace_id)
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+
+    def _stream_to_file(self, url, temp_path):
+        import requests
+        resp = self._http_get(url, stream=True)
+        # Content-Length is the size on the wire, so it is only usable when
+        # the body is not content-encoded
+        encoded = resp.headers.get("content-encoding", "identity").lower() != "identity"
+        total = 0 if encoded else int(resp.headers.get("content-length") or 0)
+        downloaded = 0
+        # (time, bytes) samples from the last few seconds, for the speed shown
+        samples = [(time.monotonic(), 0)]
+        try:
+            with open(temp_path, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=64 * 1024):
+                    if self._cancel.is_set():
+                        raise ImportCancelled()
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    now = time.monotonic()
+                    samples.append((now, downloaded))
+                    while len(samples) > 2 and now - samples[0][0] > 3:
+                        samples.pop(0)
+                    elapsed = now - samples[0][0]
+                    speed = (downloaded - samples[0][1]) / elapsed if elapsed > 0.2 else 0
+                    self._set_status(
+                        phase="downloading",
+                        # None tells the UI the size is unknown (no Content-Length)
+                        progress=(downloaded / total) if total else None,
+                        message=_download_message(downloaded, total, speed),
+                    )
+        except (requests.ConnectionError, requests.Timeout):
+            # requests reports a read timeout mid-body as a ConnectionError
+            # whose text is the raw "HTTPSConnectionPool(...): Read timed out."
+            raise _TransientDownloadError(
+                f"Connection to {_host(url)} stalled at {downloaded / 1e6:.1f} MB.")
+        finally:
+            resp.close()
+        if total and downloaded < total:
+            raise _TransientDownloadError(
+                f"Download from {_host(url)} ended early ({downloaded / 1e6:.1f} / {total / 1e6:.1f} MB).")
 
     def _do_import(self, zip_path, replace_id=None):
         index = read_index(zip_path)

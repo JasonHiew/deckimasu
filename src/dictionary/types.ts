@@ -69,11 +69,18 @@ export interface RecommendedDictionary {
     installed: boolean;
 }
 
+// Fill style for a job's progress bar: a dimmed full bar when the size is unknown
+export const progressFill = (progress: number | null | undefined) =>
+    progress == null
+        ? { width: '100%', opacity: 0.35 }
+        : { width: `${Math.round(progress * 100)}%`, opacity: 1 };
+
 export interface DictionaryJobStatus {
     busy: boolean;
     title: string;
     phase: string;
-    progress: number;
+    // 0..1, or null while downloading a file whose size the server did not send
+    progress: number | null;
     message: string;
     queued: number;
     lastError: string | null;

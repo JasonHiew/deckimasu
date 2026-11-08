@@ -18,7 +18,7 @@ import { call, openFilePicker } from "@decky/api";
 import { VFC, useCallback, useEffect, useRef, useState } from "react";
 import { useSettings } from "../SettingsContext";
 import { logger } from "../Logger";
-import { DictionaryState, InstalledDictionary } from "../dictionary/types";
+import { DictionaryState, InstalledDictionary, progressFill } from "../dictionary/types";
 
 const autoUpdateOptions = [
     { label: "Never", data: 0 },
@@ -238,7 +238,7 @@ export const TabDictionary: VFC = () => {
                                     <div style={{ height: "4px", background: "rgba(255,255,255,0.15)", borderRadius: "2px" }}>
                                         <div style={{
                                             height: "4px", borderRadius: "2px", background: "#1a9fff",
-                                            width: `${Math.round((status.progress || 0) * 100)}%`,
+                                            ...progressFill(status.progress),
                                         }} />
                                     </div>
                                 </div>
