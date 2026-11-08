@@ -71,6 +71,7 @@ dist/
 temp-build/
 dependencies_build/
 *.zip
+!py_modules/providers/dictionary/bundled/*.zip
 *.tar.gz
 out/
 cli/

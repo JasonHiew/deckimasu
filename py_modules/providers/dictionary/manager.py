@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 _JMDICT_RELEASES = "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download"
 
+# Dictionaries shipped inside the plugin (no stable public download exists)
+_BUNDLED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bundled")
+
 # Same defaults Aidoku offers: JMdict + JMnedict for terms, Jiten for frequency.
 RECOMMENDED_DICTIONARIES = [
     {
@@ -51,12 +54,26 @@ RECOMMENDED_DICTIONARIES = [
         "approxDownloadMb": 8,
         "approxInstalledMb": 70,
     },
+    {
+        "key": "accent",
+        "name": "アクセント辞典 v2 (pitch accent)",
+        "description": "Pitch accent for about 327,000 words, shown next to the reading",
+        # Bundled: installed from the plugin folder, recognised by its title
+        "bundledFile": os.path.join(_BUNDLED_DIR, "accent-dictionary-v2.zip"),
+        "bundledTitle": "アクセント辞典",
+        "indexUrl": "",
+        "downloadUrl": "",
+        "approxDownloadMb": 0,
+        "approxInstalledMb": 36,
+    },
 ]
 
 ATTRIBUTION = (
     "JMdict and JMnedict are the property of the Electronic Dictionary Research and "
     "Development Group (EDRDG), used under CC BY-SA 4.0 (edrdg.org). Jiten frequency "
-    "data from jiten.moe, CC BY-SA 4.0. Dictionary lookup ported from Yomitan (GPL-3.0)."
+    "data from jiten.moe, CC BY-SA 4.0. アクセント辞典 v2 pitch accents by Sayash, from the "
+    "shoui Yomitan dictionary collection (learnjapanese.moe). Dictionary lookup ported "
+    "from Yomitan (GPL-3.0)."
 )
 
 _HTTP_TIMEOUT = 30
@@ -136,8 +153,15 @@ class DictionaryManager:
         return result
 
     def recommended(self):
-        installed_urls = {e.get("index", {}).get("indexUrl") for e in self.store.list()}
-        return [dict(r, installed=r["indexUrl"] in installed_urls) for r in RECOMMENDED_DICTIONARIES]
+        entries = self.store.list()
+        installed_urls = {e.get("index", {}).get("indexUrl") for e in entries}
+        installed_titles = {e.get("title") for e in entries}
+        result = []
+        for r in RECOMMENDED_DICTIONARIES:
+            installed = (r["bundledTitle"] in installed_titles) if r.get("bundledFile")                 else r["indexUrl"] in installed_urls
+            result.append({k: v for k, v in r.items() if k not in ("bundledFile", "bundledTitle")}
+                          | {"installed": installed})
+        return result
 
     def set_enabled(self, dict_id, enabled):
         return self.store.set_enabled(dict_id, enabled)
@@ -154,11 +178,19 @@ class DictionaryManager:
 
     def install_recommended(self, keys=None):
         queued = 0
+        sources = {r["key"]: r for r in RECOMMENDED_DICTIONARIES}
         for r in self.recommended():
             if r["installed"] or (keys and r["key"] not in keys):
                 continue
-            self._enqueue({"kind": "download", "title": r["name"], "url": r["downloadUrl"],
-                           "indexUrl": r["indexUrl"]})
+            bundled = sources[r["key"]].get("bundledFile")
+            if bundled:
+                if not os.path.isfile(bundled):
+                    logger.error(f"Bundled dictionary is missing: {bundled}")
+                    continue
+                self._enqueue({"kind": "file", "title": r["name"], "path": bundled})
+            else:
+                self._enqueue({"kind": "download", "title": r["name"], "url": r["downloadUrl"],
+                               "indexUrl": r["indexUrl"]})
             queued += 1
         return queued
 
