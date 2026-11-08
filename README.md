@@ -1,70 +1,95 @@
-<p align="center">
-  <img src="assets/readme-logo.png" alt="Decky Translator" />
-</p>
+# decky-ocr-notify
 
-![GitHub Release](https://img.shields.io/github/v/release/cat-in-a-box/Decky-Translator)
-![License](https://img.shields.io/github/license/cat-in-a-box/Decky-Translator?color=green)
-![Build Status](https://img.shields.io/github/actions/workflow/status/cat-in-a-box/Decky-Translator/build.yml)
+**A fork of [Decky Translator](https://github.com/cat-in-a-box/Decky-Translator) tuned for learning Japanese.**
 
-[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/alexanderdev)
+Decky Translator is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin by cat-in-a-box that captures your Steam Deck screen, recognizes the text with OCR, translates it and shows the result in an overlay. All of that comes from the original project. This fork adds a Yomitan-style dictionary on top, so you can read Japanese games and look up words without leaving them, plus ways to send words to your phone or save them for later.
 
-A [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin that lets you translate any text on your Steam Deck screen.
+## What this fork adds
 
-It captures your screen, recognizes text using OCR, translates it and then shows the result with screen overlay.
+- **Dictionary lookup on the overlay.** Tap a text box (or press A on it) to open its text in a Yomitan-style popup with readings, furigana, definitions, frequency ranks and conjugation (食べさせられなかった → 食べる).
+- **Pitch accent graphs.** Each word shows its accent the way most dictionaries draw it: high and low dots joined by lines, with a hollow dot for the following particle and the pattern name (平板, 頭高, 中高, 尾高).
+- **Bookmarks.** ☆ Save a word (or press A) to look it up later. The Bookmarks tab reopens it in the sentence it came from, and lets you add a note, mark it looked up and delete it.
+- **Send to phone with ntfy.** Send a whole text box, or just one word in its dictionary form. Tapping a word notification opens it in a phone dictionary such as Shirabe Jisho.
+- **Cached translations open in the dictionary.** Translation → View Cached Translations: tap an entry or press A to look up words in its original text.
+- **Full controller navigation** of the overlay and the dictionary, with the D-pad or either stick.
+- **One-step dictionary install:** JMdict, JMnedict, Jiten frequency and the bundled アクセント辞典 v2 pitch accent dictionary.
+- **Deploy from a PC** to the Deck over SSH, staying in Game Mode.
 
-Might be helpful for learning a new language by playing games or some other purposes (you tell me!).
+## Screenshots
 
-![Screenshot](assets/screenshot_1.jpg)
+Tap a text box on the overlay to look its words up, with pitch accent graphs, frequency ranks and definitions:
 
-![Translation Demo](assets/translation.gif)
+![The dictionary popup over a game: 拭う with its reading, two pitch accent graphs (中高 and 平板), Jiten frequency ranks, a Saved bookmark and JMdict definitions](assets/screenshots/overlay-dictionary.jpg)
+
+<table>
+  <tr>
+    <td width="34%"><img src="assets/screenshots/bookmarks-tab.png" alt="Bookmarks tab: saved words with readings, a note, and buttons to mark looked up, edit the note and delete"></td>
+    <td><img src="assets/screenshots/bookmark-dictionary.png" alt="A bookmark opened in the full-screen dictionary, in the sentence it was saved from"></td>
+  </tr>
+  <tr>
+    <td align="center">Bookmarks tab</td>
+    <td align="center">A bookmark reopened in its original sentence</td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td><img src="assets/screenshots/cached-translations.png" alt="All Cached Translations: Japanese source sentences with their English translations"></td>
+    <td><img src="assets/screenshots/cached-translation-dictionary.png" alt="A cached translation opened in the dictionary, looking up 先端"></td>
+  </tr>
+  <tr>
+    <td align="center">Cached translations</td>
+    <td align="center">Opened in the dictionary</td>
+  </tr>
+</table>
 
 ## Requirements
 
 - Steam Deck (LCD or OLED)
-- Experimental support for non-steamOS handhelds and distros
 - [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) installed
-- Internet connection required for web-based providers and for initial download of offline models
+- Internet for web-based OCR/translation providers and for the first download of dictionaries and offline models
+- For send to phone: the [ntfy](https://ntfy.sh/) app on your phone and a topic to send to
 
 ## Installation
 
-### From Decky Plugin Store
-1. Install [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader/tree/main?tab=readme-ov-file#-installation) on your Steam Deck
-2. Press <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/qam.svg"><img height="16" alt="QAM" src="assets/icons/dark/qam.svg"></picture> to open the side bar and go to the Decky tab <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/plug.svg"><img height="16" alt="Decky" src="assets/icons/dark/plug.svg"></picture>
-3. In the upper right corner press <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/store.svg"><img height="16" alt="Store" src="assets/icons/dark/store.svg"></picture> to view all the available plugins
-4. Search for "Decky Translator" and install it
+This fork is not in the Decky plugin store and has no release builds yet. Install it in two steps:
 
-### Manual Installation
-1. Install [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader/tree/main?tab=readme-ov-file#-installation) on your Steam Deck
-2. [Download](https://github.com/cat-in-a-box/Decky-Translator/releases/latest/download/Decky.Translator.zip) the latest release from the [Releases](https://github.com/cat-in-a-box/decky-translator/releases) page
-3. Upload *Decky.Translator.zip* archive to any directory on your Steam Deck
-4. Press <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/qam.svg"><img height="16" alt="QAM" src="assets/icons/dark/qam.svg"></picture>, go to the Decky tab <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/plug.svg"><img height="16" alt="Decky" src="assets/icons/dark/plug.svg"></picture> and click <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/gear.svg"><img height="16" alt="Settings" src="assets/icons/dark/gear.svg"></picture>
-5. Enable "Developer Mode" in General tab
-6. Open the Developer tab
-7. Install Plugin from ZIP file -> "Browse" and then select *Decky.Translator.zip*
+1. **Install the original Decky Translator once**, from the Decky plugin store or from its [latest release](https://github.com/cat-in-a-box/Decky-Translator/releases/latest). This puts the plugin and its Python dependencies on the Deck.
+   - From the store: press <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/qam.svg"><img height="16" alt="QAM" src="assets/icons/dark/qam.svg"></picture>, open the Decky tab <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/plug.svg"><img height="16" alt="Decky" src="assets/icons/dark/plug.svg"></picture>, press the store icon <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/store.svg"><img height="16" alt="Store" src="assets/icons/dark/store.svg"></picture> and install "Decky Translator".
+   - From a zip: in Decky settings <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/gear.svg"><img height="16" alt="Settings" src="assets/icons/dark/gear.svg"></picture>, enable Developer Mode, then Developer → Install Plugin from ZIP file.
+2. **Deploy this fork's code over it** from a PC with [`tools/deploy-to-deck`](#updating-the-deck-from-a-pc). It replaces the plugin's code and keeps the installed dependencies.
 
-## How to use it?
+## Using it
 
-1. Press "Translate" button in the main tab of the plugin
-2. Press <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/qam.svg"><img height="16" alt="QAM" src="assets/icons/dark/qam.svg"></picture> to open the menu again and press "Close Overlay"
+1. Open the plugin and press **Translate**, or hold **L4** for a quick translation. Hold L4 again to close the overlay. The button can be changed in the Controls tab.
+2. Tap a text box on the overlay, or pick it with the D-pad and press A, to open it in the dictionary.
+3. In the dictionary, tap any character to look up the longest word starting there.
 
-## How to quickly use it?
+## Dictionary
 
-1. Hold L4 button for a Quick Translation
-2. Hold L4 button again to disable the translation overlay
+The popup shows the box's recognized text at the top; tap a character to look up from there. Results show readings, furigana, pitch accent, frequency ranks and definitions. Tapping a word inside a definition looks it up too (Back returns).
 
-Button or Combinations can be configured in the Controls tab
+- **Install dictionaries** from the Dictionary tab in one step: JMdict (English), JMnedict (names), Jiten frequency and アクセント辞典 v2 (pitch accent). That is about 35 MB to download and 250 MB on disk. アクセント辞典 v2 ships inside the plugin, so it installs without downloading. Any Yomitan-format dictionary can also be added from a .zip file or URL.
+- Dictionaries can be reordered, disabled, deleted and updated. Updatable ones are checked automatically (weekly by default). Downloads show their size, speed and time left, and retry if the connection stalls.
+- **Pitch accent** is drawn as a graph under the word: a dot per mora, high or low, joined by lines so each rise or drop is a diagonal. The hollow dot after the word is the following particle (が, は). It tells 平板 (stays high: はし [0] 端) from 尾高 (drops onto the particle: はし [2] 橋). The number is the mora the pitch drops after.
 
-## Dictionary lookup
+### Bookmarks
 
-Tap any text box on the overlay to look up the Japanese words in it, Yomitan style. The popup shows the box's recognized text; tap any character to look up the longest word starting there, including conjugated forms (食べさせられなかった → 食べる). Results show readings, furigana, frequency ranks and definitions.
+Press **☆ Save** on an entry (or A with a controller) to save the word. It turns into ★ Saved; press it again to remove it.
 
-- **Send to phone** sends the box's text via ntfy, and **Word** sends just the word in its dictionary form (行ってしまった → 行く), ready for another dictionary app. Tapping that notification opens the link set under Controls → Configure ntfy → Word link: Shirabe Jisho by default, or an iOS Shortcut that copies the word first so Shirabe's clipboard search can stay on. Tapping a box no longer sends anything by itself.
-- The Dictionary tab installs the recommended dictionaries in one step (JMdict, JMnedict, Jiten frequency and アクセント辞典 v2 pitch accents, about 35 MB to download and 250 MB on disk), or any Yomitan-format dictionary from a .zip file or URL. アクセント辞典 v2 ships inside the plugin, so it installs without downloading; its pitch numbers show next to each word's reading.
-- **☆ Save** (or A) bookmarks a word for later. The Bookmarks tab lists saved words: open one in the dictionary, add a note, mark it looked up, delete it, or delete all looked-up words at once. You can also type a word there to save it.
-- In Translation → View Cached Translations, tapping an entry (or pressing A) opens its original text in the dictionary.
-- Dictionaries can be reordered, disabled, deleted and updated. Updatable dictionaries are checked automatically (weekly by default).
+The **Bookmarks** tab lists saved words:
 
-With a controller (can be turned off under Controls → Controller Navigation). The sticks work like the D-pad and repeat while held:
+- **Open:** tap a word or press A to open it in the dictionary, in the sentence it was saved from.
+- **✓ Looked up:** marks it done (struck through). ↩ undoes it. "Hide looked-up words" hides them.
+- **✎ Note:** add or edit a note.
+- **🗑 Delete:** one word, or **Delete looked-up words** for all done ones at once (press twice to confirm).
+- **Add a word:** type a word to save it without a lookup.
+
+Bookmarks are stored separately from the translation cache, with their own copy of the sentence, so clearing cached translations does not affect them.
+
+### Controller
+
+Controller navigation can be turned off under Controls → Controller Navigation (useful if the game reacts to the buttons). The sticks work like the D-pad and repeat while held.
 
 | Where | Button | Action |
 |-------|--------|--------|
@@ -80,29 +105,60 @@ With a controller (can be turned off under Controls → Controller Navigation). 
 | Dictionary | Y | Send the picked entry's word (dictionary form only) |
 | Dictionary | B | Back after following a cross-reference, otherwise close |
 
-### Looking words up on an iPhone (Shirabe Jisho)
+The same controls work in the dictionary opened from the Bookmarks tab and from cached translations.
 
-Word notifications are meant to be looked up in a phone dictionary such as [Shirabe Jisho](https://apps.apple.com/app/id1005203380). There are three ways to get the word into it:
+## Sending to your phone (ntfy)
 
-1. **Tap the notification.** The Word link (Controls → Configure ntfy) is `shirabelookup://search?w={word}` by default. That's Shirabe's lookup link, documented in its 1.8 release notes, and ntfy opens it when the notification is tapped. Shirabe's "search clipboard on open" setting can win over the link and search the clipboard instead. That depends on how Shirabe was opened, and it may not happen at all.
-2. **Tap the notification, through a Shortcut.** If the clipboard keeps winning, pick the "Shirabe via Shortcut" preset. It runs an iOS Shortcut named `Shirabe` that receives text and does two things: **Copy to Clipboard** (Shortcut Input), then **Open URLs** `shirabelookup://search?w=` + Shortcut Input. Clipboard search and the link then agree, so clipboard search can stay on for your other OCR apps.
-3. **No tap: open Shirabe as soon as the notification arrives** (iOS 27 notification automations). In Shortcuts → Automation, add "When I receive a notification from ntfy". Turn **Automation** on and **Notify** off, so it runs without asking. Then add **Open URLs** `shirabelookup://search?w=` followed by the notification's **Body**:
+Set it up under Controls → Notifications (ntfy) → **Configure ntfy**: the server URL (for example `https://ntfy.sh`), your topic, an optional access token, and the **Word link**. Subscribe to the same topic in the ntfy app on your phone.
 
-   <img src="assets/docs/ios-shirabe-automation.png" alt="iOS Shortcuts automation: when a notification from ntfy arrives, open shirabelookup://search?w= followed by the notification body" width="320">
+- **Send to phone** (X) sends the whole text box.
+- **Word** (Y) sends just the word in its dictionary form (行ってしまった → 行く). Tapping the notification opens the **Word link** with that word.
 
-   This runs for every ntfy notification, including "Send to phone" sentences, so add a filter (Add Filter) if those go to the same topic. Opening an app from an automation may only work while the phone is unlocked.
+Nothing is sent by tapping a box; sending is always an explicit button.
 
-## Updating a Deck from a PC (no Desktop Mode)
+### Opening words in a phone dictionary
 
-`tools/deploy-to-deck.sh` builds the plugin and copies its code to the Deck over SSH, keeping the dependencies that are already installed there. Decky reloads the plugin automatically, so the Deck can stay in Game Mode. It needs SSH enabled on the Deck once (see the script header) and the plugin installed once by the normal route.
+The Word link is a link template where `{word}` is replaced by the word. ntfy attaches it to the notification as its click action, so tapping the notification opens it. Configure ntfy has two presets:
+
+| Preset | Link | Phone |
+|--------|------|-------|
+| Shirabe Jisho (default) | `shirabelookup://search?w={word}` | iPhone ([Shirabe Jisho](https://apps.apple.com/app/id1005203380) is iOS only) |
+| Jisho.org | `https://jisho.org/search/{word}` | Any phone, opens in the browser |
+
+Any other app or site that accepts the word in a link works too; type its link with `{word}` in it. On Android, a dictionary app's deep link works the same way if the app registers one.
+
+If Shirabe searches the clipboard instead of the word, turn off its "search clipboard on open" setting; it can win over the link depending on how Shirabe was opened.
+
+**Optional, iPhone: open Shirabe without tapping** (iOS 27 notification automations). In Shortcuts → Automation, add "When I receive a notification from ntfy". Turn **Automation** on and **Notify** off, so it runs without asking. Then add **Open URLs** `shirabelookup://search?w=` followed by the notification's **Body**. This runs for every ntfy notification, including "Send to phone" sentences, so add a filter (Add Filter) if those go to the same topic. Opening an app from an automation may only work while the phone is unlocked.
+
+## Updating the Deck from a PC
+
+`tools/deploy-to-deck.sh` builds the plugin and copies its code to the Deck over SSH, keeping the dependencies already installed there. Decky reloads the plugin automatically, so the Deck can stay in Game Mode.
+
+One-time setup on the Deck (Desktop Mode, Konsole): set a password with `passwd` and enable SSH with `sudo systemctl enable --now sshd`. The first deploy asks for the password once more to turn on hot reload for the plugin.
 
 ```bash
-tools/deploy-to-deck.sh
+tools/deploy-to-deck.sh 192.168.0.42
 ```
 
-From cmd or PowerShell on Windows, `tools\deploy-to-deck.cmd` runs the same script through Git Bash.
+From cmd or PowerShell on Windows, `tools\deploy-to-deck.cmd 192.168.0.42` runs the same script through Git Bash. The host can also come from the `DECK_HOST` environment variable. Options: `--no-build`, `--sudo` (if the plugin files are root-owned), `--dry-run`.
 
-## How does it do that? 
+To skip the password on every deploy, add an SSH key once (PowerShell):
+
+```powershell
+ssh-keygen -t ed25519 -f $HOME\.ssh\id_ed25519 -N '""'
+type $HOME\.ssh\id_ed25519.pub | ssh deck@192.168.0.42 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+```
+
+## Translation and OCR
+
+The rest of this README describes the translation side, which comes from Decky Translator unchanged.
+
+![Decky Translator's translation overlay](assets/screenshot_1.jpg)
+
+![Translation demo](assets/translation.gif)
+
+### How does it do that?
 
 Decky Translator allows you to choose different Text Recognition and Translation methods - feel free to experiment.
 
@@ -217,34 +273,24 @@ Try increasing the "Font Scaling" option in plugin settings
 Double-check that you entered it correctly. If the issue persists, please raise an issue - let's investigate it together
 
 ### I see nothing / Recognition is bad / It does not translate anything
-Try other combination of text recognition and translation methods. If it doesnt solve the problem - please report it here [New Issue](https://github.com/cat-in-a-box/Decky-Translator/issues/new). It will also help if you attach your .log file there
+Try other combination of text recognition and translation methods. If the problem is on the translation side and also happens with the original Decky Translator, it can be reported to that project's [issue tracker](https://github.com/cat-in-a-box/Decky-Translator/issues). Problems with the dictionary, bookmarks or ntfy belong to this fork.
 
-## To-Do
-### Functional
-- [x] Add offline OCR functionality
-- [x] Fix interface scaling issues on non-default SteamOS values (experimental)
-- [x] Rework temporary files solution
-- [x] Gamepad support
-- [x] Overlay font scaling for large monitors
-- [x] Fully offline Translation functionality
-- [x] Support for non-SteamOS distros
-- [ ] Disable in-game buttons while overlay is active
-- [ ] Desktop mode support
-- [ ] Nicer look for translation overlay
-- [ ] TTS for translated text (press the translated label to listen)
+### Dictionary downloads are slow or time out
+The plugin retries a stalled download up to 3 times. Some dictionary servers (notably api.jiten.moe) are sometimes slow for everyone; try again later, or download the zip on a PC and install it from a file in the Dictionary tab.
 
 ## Third-Party Dependencies
 
-This plugin uses the following third-party components. None of the heavy models are bundled in the plugin zip — they're downloaded on demand by a user.
+This plugin uses the following third-party components. None of the heavy models are bundled; they're downloaded on demand. The one bundled file is the small アクセント辞典 v2 pitch accent dictionary (3 MB).
 
 ### Dictionaries
 
-Downloaded on demand from the Dictionary tab. The lookup engine (deinflection rules, text normalization, furigana and structured-content rendering) is ported from [Yomitan](https://github.com/yomidevs/yomitan) (GPL-3.0-or-later).
+Installed from the Dictionary tab. The lookup engine (deinflection rules, text normalization, furigana and structured-content rendering) is ported from [Yomitan](https://github.com/yomidevs/yomitan) (GPL-3.0-or-later).
 
 | Component | Source | License |
 |-----------|--------|---------|
 | JMdict, JMnedict | [EDRDG](https://www.edrdg.org/) via [jmdict-yomitan](https://github.com/yomidevs/jmdict-yomitan) | CC BY-SA 4.0 |
 | Jiten frequency list | [jiten.moe](https://jiten.moe/other) | CC BY-SA 4.0 |
+| アクセント辞典 v2 (pitch accent, bundled) | By Sayash, from the shoui Yomitan dictionary collection on [learnjapanese.moe](https://learnjapanese.moe/yomichan) | Not stated by the source |
 
 ### Chrome Screen AI library
 
@@ -314,16 +360,16 @@ Loaded from CDN on demand for the translated text overlay. Not bundled in the pl
 | Source                                                                                                                                         | License                     |
 |------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
 | [Google Fonts](https://fonts.google.com/) (Open Sans, Montserrat, Noto Sans, Lexend, Atkinson Hyperlegible Next, Andika, etc.)                 | SIL Open Font License (OFL) |
-| [OpenDyslexic](https://opendyslexic.org/) (via [@fontsource/opendyslexic](https://www.npmjs.com/package/@fontsource/opendyslexic) on jsDelivr) | SIL Open Font License (OFL) |
+| [OpenDyslexic](https://opendyslexic.org/) (via [`@fontsource/opendyslexic`](https://www.npmjs.com/package/@fontsource/opendyslexic) on jsDelivr) | SIL Open Font License (OFL) |
 
 
-## Support
+## Credits
 
-If you find this plugin useful - feel free to buy me a cup of coffee ❤️
-
-[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/alexanderdev)
+This is a fork of **[Decky Translator](https://github.com/cat-in-a-box/Decky-Translator)** by cat-in-a-box. The screen capture, OCR, translation providers, overlay and almost everything outside the dictionary features are their work. If you find the translator useful, consider supporting the original author on [Ko-fi](https://ko-fi.com/alexanderdev).
 
 ## Thanks to
+
+From the original project:
 
 - [Valve](https://www.valvesoftware.com/) for creating the Steam Deck - a beautiful device that makes projects like this possible
 - [UGT (Universal Game Translator)](https://github.com/SethRobinson/UGT) by Seth Robinson for inspiration and the idea of using game translation as a language learning tool
@@ -338,3 +384,11 @@ If you find this plugin useful - feel free to buy me a cup of coffee ❤️
 - [astral-sh/python-build-standalone](https://github.com/astral-sh/python-build-standalone) for the portable Python runtime
 - [steam3d](https://github.com/steam3d) for the SteamOS UI icons
 - And You. Yes, You
+
+Added by this fork:
+
+- [Yomitan](https://github.com/yomidevs/yomitan), whose lookup engine the dictionary is ported from
+- [EDRDG](https://www.edrdg.org/) for JMdict and JMnedict, and [yomidevs/jmdict-yomitan](https://github.com/yomidevs/jmdict-yomitan) for the Yomitan builds
+- [jiten.moe](https://jiten.moe/) for the frequency list
+- Sayash and the shoui collection on [learnjapanese.moe](https://learnjapanese.moe/) for アクセント辞典 v2
+- [ntfy](https://ntfy.sh/) for push notifications and [Shirabe Jisho](https://apps.apple.com/app/id1005203380) for the phone lookups
