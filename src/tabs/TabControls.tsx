@@ -23,7 +23,8 @@ import { useFontOptions, isRemoteFont, loadRemoteFont } from "../fonts";
 // Links the dictionary's Word button can attach; {word} is filled in
 const WORD_LINK_PRESETS = [
     { label: "Shirabe Jisho", link: "shirabelookup://search?w={word}" },
-    { label: "Shirabe via Shortcut", link: "shortcuts://run-shortcut?name=Shirabe&input=text&text={word}" },
+    // A web page, so it also works on Android (Shirabe Jisho is iOS only)
+    { label: "Jisho.org", link: "https://jisho.org/search/{word}" },
     { label: "None", link: "" },
 ];
 
@@ -74,8 +75,8 @@ const NtfySettingsModal: VFC<{
                     onChange={(e) => setWordLink(e.target.value)}
                 />
                 <p style={{ margin: "6px 0 8px", color: "#aaa", fontSize: "12px" }}>
-                    {"{word}"} is replaced with the word. "Shirabe via Shortcut" runs an iOS Shortcut named
-                    Shirabe that copies the word and then opens Shirabe Jisho, so its clipboard search can stay on.
+                    {"{word}"} is replaced with the word. Shirabe Jisho is an iPhone app; Jisho.org opens in
+                    the phone's browser and also works on Android.
                 </p>
                 <Focusable style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     {WORD_LINK_PRESETS.map(p => (
