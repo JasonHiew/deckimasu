@@ -12,7 +12,7 @@ Decky Translator is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-
 - **Send to phone with ntfy.** Send a whole text box, or just one word in its dictionary form. Tapping a word notification opens it in a phone dictionary such as Shirabe Jisho.
 - **Cached translations open in the dictionary.** Translation → View Cached Translations: tap an entry or press A to look up words in its original text.
 - **Full controller navigation** of the overlay and the dictionary, with the D-pad or either stick.
-- **One-step dictionary install:** JMdict, JMnedict, Jiten frequency and the bundled アクセント辞典 v2 pitch accent dictionary.
+- **One-step dictionary install:** JMdict, JMnedict, Jiten frequency and a bundled Kanjium pitch accent dictionary. Any other Yomitan dictionary can be added from a .zip.
 - **Deploy from a PC** to the Deck over SSH, staying in Game Mode.
 
 ## Screenshots
@@ -69,9 +69,26 @@ This fork is not in the Decky plugin store and has no release builds yet. Instal
 
 The popup shows the box's recognized text at the top; tap a character to look up from there. Results show readings, furigana, pitch accent, frequency ranks and definitions. Tapping a word inside a definition looks it up too (Back returns).
 
-- **Install dictionaries** from the Dictionary tab in one step: JMdict (English), JMnedict (names), Jiten frequency and アクセント辞典 v2 (pitch accent). That is about 35 MB to download and 250 MB on disk. アクセント辞典 v2 ships inside the plugin, so it installs without downloading. Any Yomitan-format dictionary can also be added from a .zip file or URL.
+- **Install dictionaries** from the Dictionary tab in one step: JMdict (English), JMnedict (names), Jiten frequency and Kanjium pitch accents. That is about 35 MB to download and 230 MB on disk. The Kanjium pitch dictionary ships inside the plugin, so it installs without downloading. Other Yomitan-format dictionaries can be added from a [.zip file](#installing-a-dictionary-from-a-zip) or a URL.
 - Dictionaries can be reordered, disabled, deleted and updated. Updatable ones are checked automatically (weekly by default). Downloads show their size, speed and time left, and retry if the connection stalls.
 - **Pitch accent** is drawn as a graph under the word: a dot per mora, high or low, joined by lines so each rise or drop is a diagonal. The hollow dot after the word is the following particle (が, は). It tells 平板 (stays high: はし [0] 端) from 尾高 (drops onto the particle: はし [2] 橋). The number is the mora the pitch drops after.
+
+### Installing a dictionary from a .zip
+
+Any dictionary made for [Yomitan](https://github.com/yomidevs/yomitan) works: term dictionaries (definitions), frequency lists and pitch accent dictionaries. Collections of them include the [learnjapanese.moe Yomitan guide](https://learnjapanese.moe/yomichan) and [MarvNC's yomitan-dictionaries](https://github.com/MarvNC/yomitan-dictionaries). For example, the guide's Pitch Accent folder has アクセント辞典v2, which covers more words than Kanjium.
+
+1. **Get the .zip onto the Deck**, into the Downloads folder (`/home/deck/Downloads`). Don't unzip it. Either:
+   - in Desktop Mode, download it with a browser, which saves to Downloads; or
+   - from a PC on the same network, copy it over SSH (the same setup as [deploying from a PC](#updating-the-deck-from-a-pc)):
+     ```bash
+     scp "アクセント辞典v2.zip" deck@192.168.0.42:~/Downloads/
+     ```
+2. Open the plugin's **Dictionary** tab → **Add Dictionaries** → **Import from file**, and pick the .zip. The file picker opens in Downloads.
+3. Wait for the import to finish (the Status section shows progress). The new dictionary is used in lookups straight away.
+
+If the dictionary has a direct download link, **Install from URL** does the same without copying a file. Links to a dictionary's index `.json` also enable automatic updates.
+
+With more than one pitch dictionary installed, each accent is drawn once even if several dictionaries list it. Reorder, disable or delete dictionaries under **Installed Dictionaries**.
 
 ### Bookmarks
 
@@ -280,7 +297,7 @@ The plugin retries a stalled download up to 3 times. Some dictionary servers (no
 
 ## Third-Party Dependencies
 
-This plugin uses the following third-party components. None of the heavy models are bundled; they're downloaded on demand. The one bundled file is the small アクセント辞典 v2 pitch accent dictionary (3 MB).
+This plugin uses the following third-party components. None of the heavy models are bundled; they're downloaded on demand. The one bundled file is the small Kanjium pitch accent dictionary (1 MB).
 
 ### Dictionaries
 
@@ -290,7 +307,7 @@ Installed from the Dictionary tab. The lookup engine (deinflection rules, text n
 |-----------|--------|---------|
 | JMdict, JMnedict | [EDRDG](https://www.edrdg.org/) via [jmdict-yomitan](https://github.com/yomidevs/jmdict-yomitan) | CC BY-SA 4.0 |
 | Jiten frequency list | [jiten.moe](https://jiten.moe/other) | CC BY-SA 4.0 |
-| アクセント辞典 v2 (pitch accent, bundled) | By Sayash, from the shoui Yomitan dictionary collection on [learnjapanese.moe](https://learnjapanese.moe/yomichan) | Not stated by the source |
+| Kanjium pitch accents (bundled) | [Kanjium](https://github.com/mifunetoshiro/kanjium) `accents.txt`, provided by Uros O. through his free database; converted with `tools/build-kanjium-pitch.py` | CC BY-SA 4.0 |
 
 ### Chrome Screen AI library
 
@@ -390,5 +407,5 @@ Added by this fork:
 - [Yomitan](https://github.com/yomidevs/yomitan), whose lookup engine the dictionary is ported from
 - [EDRDG](https://www.edrdg.org/) for JMdict and JMnedict, and [yomidevs/jmdict-yomitan](https://github.com/yomidevs/jmdict-yomitan) for the Yomitan builds
 - [jiten.moe](https://jiten.moe/) for the frequency list
-- Sayash and the shoui collection on [learnjapanese.moe](https://learnjapanese.moe/) for アクセント辞典 v2
+- [Kanjium](https://github.com/mifunetoshiro/kanjium) and Uros O. for the pitch accent data
 - [ntfy](https://ntfy.sh/) for push notifications and [Shirabe Jisho](https://apps.apple.com/app/id1005203380) for the phone lookups

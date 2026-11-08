@@ -46,3 +46,10 @@ Dictionary Research and Development Group)
 Jiten frequency list (downloaded at runtime, not bundled)
 https://jiten.moe
 License: Creative Commons Attribution-ShareAlike 4.0
+
+Kanjium pitch accents (bundled: py_modules/providers/dictionary/bundled/kanjium-pitch-accents.zip,
+built from data/source_files/raw/accents.txt by tools/build-kanjium-pitch.py)
+https://github.com/mifunetoshiro/kanjium
+"The pitch accent notation ... were provided by Uros O. through his free database."
+License: Creative Commons Attribution-ShareAlike 4.0 (the converted dictionary is
+distributed under the same license)

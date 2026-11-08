@@ -522,7 +522,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                             <>
                                 <div>No dictionaries are installed.</div>
                                 <div style={{ opacity: 0.7, fontSize: '13px', marginBottom: '8px' }}>
-                                    JMdict, JMnedict, Jiten frequency and アクセント辞典 pitch accents (about 35 MB download, 250 MB on disk).
+                                    JMdict, JMnedict, Jiten frequency and Kanjium pitch accents (about 35 MB download, 230 MB on disk).
                                     You can manage them in the plugin's Dictionary tab.
                                 </div>
                                 <div style={BUTTON_STYLE} onClick={installRecommended}>Install recommended dictionaries</div>

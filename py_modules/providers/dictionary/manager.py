@@ -55,24 +55,25 @@ RECOMMENDED_DICTIONARIES = [
         "approxInstalledMb": 70,
     },
     {
-        "key": "accent",
-        "name": "アクセント辞典 v2 (pitch accent)",
-        "description": "Pitch accent for about 327,000 words, shown next to the reading",
-        # Bundled: installed from the plugin folder, recognised by its title
-        "bundledFile": os.path.join(_BUNDLED_DIR, "accent-dictionary-v2.zip"),
-        "bundledTitle": "アクセント辞典",
+        "key": "pitch",
+        "name": "Kanjium pitch accents",
+        "description": "Pitch accent for about 124,000 words, drawn as a graph under the reading",
+        # Bundled: installed from the plugin folder, recognised by its title.
+        # Built from Kanjium (CC BY-SA 4.0) by tools/build-kanjium-pitch.py
+        "bundledFile": os.path.join(_BUNDLED_DIR, "kanjium-pitch-accents.zip"),
+        "bundledTitle": "Kanjium Pitch Accents",
         "indexUrl": "",
         "downloadUrl": "",
         "approxDownloadMb": 0,
-        "approxInstalledMb": 36,
+        "approxInstalledMb": 13,
     },
 ]
 
 ATTRIBUTION = (
     "JMdict and JMnedict are the property of the Electronic Dictionary Research and "
     "Development Group (EDRDG), used under CC BY-SA 4.0 (edrdg.org). Jiten frequency "
-    "data from jiten.moe, CC BY-SA 4.0. アクセント辞典 v2 pitch accents by Sayash, from the "
-    "shoui Yomitan dictionary collection (learnjapanese.moe). Dictionary lookup ported "
+    "data from jiten.moe, CC BY-SA 4.0. Pitch accents from Kanjium (github.com/mifunetoshiro/kanjium), "
+    "provided by Uros O. through his free database, CC BY-SA 4.0. Dictionary lookup ported "
     "from Yomitan (GPL-3.0)."
 )
 
