@@ -391,6 +391,32 @@ function calculateFontSize(region: TranslatedRegion, scalingFactor: number, font
     return Math.max(7, Math.min(fontSize, 48));
 }
 
+// Full-width characters (kana, kanji, full-width punctuation and forms) take
+// about 1em; everything else about 0.55em
+const FULL_WIDTH = /[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/;
+
+function textWidthEm(line: string): number {
+    let em = 0;
+    for (const ch of line) em += FULL_WIDTH.test(ch) ? 1 : 0.55;
+    return em;
+}
+
+// Font size for showing a box's recognized (original) text. Keeps the OCR's
+// own line breaks and makes the lines fill the box the way they do in the game,
+// so the text sits close to where it is on screen (and where taps land).
+function calculateOriginalFontSize(region: TranslatedRegion, scalingFactor: number, fontScale: number): number {
+    const lines = region.text.split('\n');
+    // The OCR box hugs the characters' ink, which for Japanese is about one em
+    // per line, so no room for line spacing is taken off (the label is drawn
+    // with a few pixels of padding around the box anyway)
+    const boxWidth = (region.rect.right - region.rect.left) * scalingFactor;
+    const boxHeight = (region.rect.bottom - region.rect.top) * scalingFactor;
+    if (boxWidth <= 0 || boxHeight <= 0) return 7;
+    const widestEm = Math.max(1, ...lines.map(textWidthEm));
+    const fontSize = Math.min(boxHeight / lines.length, boxWidth / widestEm) * fontScale;
+    return Math.max(7, Math.min(fontSize, 64));
+}
+
 // Best guess at which character of a box's recognized text sits under a tap.
 // Merged boxes only keep their combined bounds, with stacked lines joined by
 // newlines, so this assumes evenly spread characters; the popup's text strip
@@ -771,11 +797,16 @@ export const TranslatedTextOverlay: VFC<{
                         });
 
                         return regions.map((region, index) => {
-                            const fontSize = calculateFontSize(region, generalFactor, fontScale);
-                            let displayText = showOriginalText ? region.text : (region.translatedText || region.text);
+                            // The original text is sized from itself and keeps its line breaks;
+                            // sizing it from the (longer) translation shrank and re-wrapped it
+                            const showingOriginal = showOriginalText || !region.translatedText;
+                            const fontSize = showingOriginal
+                                ? calculateOriginalFontSize(region, generalFactor, fontScale)
+                                : calculateFontSize(region, generalFactor, fontScale);
+                            let displayText = showingOriginal ? region.text : region.translatedText;
 
                             // Redistribute text to fill original block height, minimising width
-                            if (allowLabelGrowth) {
+                            if (allowLabelGrowth && !showingOriginal) {
                                 const lineHeight = fontSize * 1.15;
                                 const availableHeight = scaled[index].height - 4;
                                 const maxLines = Math.max(1, Math.floor(availableHeight / lineHeight));
@@ -868,7 +899,7 @@ export const TranslatedTextOverlay: VFC<{
                                         fontFamily: translatedOverlayFontFamily,
 
                                         wordWrap: "break-word",
-                                        whiteSpace: "pre-wrap",
+                                        whiteSpace: showingOriginal ? "pre" : "pre-wrap",
                                         cursor: 'pointer',
 
                                         animation: "fadeInTranslation 0.2s ease-out forwards"
