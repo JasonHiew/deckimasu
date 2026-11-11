@@ -944,7 +944,14 @@ try:
     EVDEV_AVAILABLE = True
 except ImportError as e:
     EVDEV_AVAILABLE = False
-    logger.warning(f"evdev import failed: {e}")
+    # The dependency bundle ships evdev built for one Python version; when
+    # Decky's embedded Python differs (3.14 vs the bundle's 3.11 as of
+    # 2026-11) its C extension cannot load. Only external gamepads need it;
+    # the Deck's own buttons are read over hidraw.
+    logger.info(
+        f"External gamepad support off: bundled evdev does not load on Python "
+        f"{sys.version_info.major}.{sys.version_info.minor} ({e})"
+    )
 except Exception as e:
     EVDEV_AVAILABLE = False
     logger.warning(f"evdev import error ({type(e).__name__}): {e}")

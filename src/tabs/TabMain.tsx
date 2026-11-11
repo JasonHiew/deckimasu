@@ -161,7 +161,8 @@ export const TabMain: VFC<TabMainProps> = ({ logic, overlayVisible, providerStat
                     <PanelSectionRow>
                         <ToggleField
                             label="Live subtitles"
-                            description="Translates the screen every few seconds while you play and shows it over the game. Heavy: about one CPU core, and the on-device OCR model (~0.5 GB) stays loaded. Open the overlay as usual to look words up."
+                            description={"Translates the screen every few seconds while you play and shows it over the game. Heavy: about one CPU core, and the on-device OCR model (~0.4 GB) stays loaded. Open the overlay as usual to look words up."
+                                + (settings.translationProvider === 'ct2' ? "" : " Web translation can hit rate limits with this on; lines it can't translate are skipped and retried.")}
                             checked={settings.liveSubtitles}
                             onChange={(value) => updateSetting('liveSubtitles', value, 'Live subtitles')}
                         />

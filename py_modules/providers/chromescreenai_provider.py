@@ -189,7 +189,15 @@ class ChromeScreenAIProvider(OCRProvider):
                         line = raw.decode('utf-8', errors='replace').rstrip()
                     except Exception:
                         continue
-                    if line:
+                    if not line:
+                        continue
+                    # The engine logs its normal start-up (model loading, TFLite
+                    # delegates) to stderr as info lines: "I0000 ...", "INFO: ...",
+                    # plus a notice about logging before InitGoogle. Keep those out
+                    # of the warnings so real problems stand out.
+                    if (line[:1] == "I" and line[1:5].isdigit()) or line.startswith(("INFO:", "WARNING: Logging before InitGoogle")):
+                        logger.debug(f"ChromeScreenAI worker: {line}")
+                    else:
                         logger.warning(f"ChromeScreenAI worker stderr: {line}")
             except Exception:
                 pass
