@@ -5,6 +5,7 @@
 // what tells 平板 (stays high) apart from 尾高 (drops onto the particle).
 
 import { VFC } from "react";
+import { toRomaji } from "./romaji";
 
 const SMALL_KANA = /[ゃゅょぁぃぅぇぉゎャュョァィゥェォヮㇰㇱㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ]/;
 
@@ -42,8 +43,23 @@ const HIGH_Y = 5;
 const LOW_Y = 17;
 const TEXT_Y = 35;
 const COLOR = "#4fc3f7";
+const ROMAJI_Y = 48;
 
-export const PitchGraph: VFC<{ reading: string; downstep: number }> = ({ reading, downstep }) => {
+// Romaji under each mora: っ shows the consonant it doubles, ー the vowel it lengthens
+function moraRomaji(morae: string[], i: number): string {
+    const m = morae[i];
+    if (m === 'っ' || m === 'ッ') {
+        const next = i + 1 < morae.length ? toRomaji(morae[i + 1]) : '';
+        return next.startsWith('ch') ? 't' : next[0] && !/[aeiou]/.test(next[0]) ? next[0] : '';
+    }
+    if (m === 'ー') {
+        const prev = i > 0 ? moraRomaji(morae, i - 1) : '';
+        return prev.slice(-1);
+    }
+    return toRomaji(m);
+}
+
+export const PitchGraph: VFC<{ reading: string; downstep: number; showRomaji?: boolean }> = ({ reading, downstep, showRomaji = false }) => {
     const morae = splitMorae(reading);
     if (morae.length === 0 || downstep < 0 || downstep > morae.length) return null;
     const levels = pitchPattern(morae.length, downstep);
@@ -51,11 +67,12 @@ export const PitchGraph: VFC<{ reading: string; downstep: number }> = ({ reading
     const y = (i: number) => (levels[i] ? HIGH_Y : LOW_Y);
     const width = (morae.length + 1) * MORA_WIDTH;
     const last = morae.length; // index of the particle point
+    const height = showRomaji ? 52 : 40;
 
     return (
         <span style={{ display: "inline-flex", alignItems: "flex-end", gap: "4px", marginRight: "10px", verticalAlign: "middle" }}
               title={`[${downstep}] ${patternName(morae.length, downstep)}`}>
-            <svg width={width} height={40} viewBox={`0 0 ${width} 40`} style={{ display: "block", overflow: "visible" }}>
+            <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block", overflow: "visible" }}>
                 {/* Word: solid line through the morae */}
                 <polyline
                     points={morae.map((_, i) => `${x(i)},${y(i)}`).join(" ")}
@@ -71,6 +88,10 @@ export const PitchGraph: VFC<{ reading: string; downstep: number }> = ({ reading
                 {morae.map((m, i) => (
                     <text key={`t${i}`} x={x(i)} y={TEXT_Y} textAnchor="middle" fontSize={m.length > 1 ? 11 : 14}
                           fill="#fff" lang="ja">{m}</text>
+                ))}
+                {showRomaji && morae.map((_, i) => (
+                    <text key={`r${i}`} x={x(i)} y={ROMAJI_Y} textAnchor="middle" fontSize={9}
+                          fill="#b8bcbf">{moraRomaji(morae, i)}</text>
                 ))}
             </svg>
             <span style={{ fontSize: "11px", opacity: 0.6, lineHeight: "14px", paddingBottom: "4px" }}>

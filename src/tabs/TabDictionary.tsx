@@ -19,6 +19,8 @@ import { VFC, useCallback, useEffect, useRef, useState } from "react";
 import { useSettings } from "../SettingsContext";
 import { logger } from "../Logger";
 import { DictionaryState, InstalledDictionary, progressFill } from "../dictionary/types";
+import { getShowRomaji, setShowRomaji } from "../dictionary/romaji";
+import { KanaChartModal } from "../dictionary/KanaChartModal";
 
 const autoUpdateOptions = [
     { label: "Never", data: 0 },
@@ -176,6 +178,7 @@ const ImportUrlModal: VFC<{ onSubmit: (url: string) => void; closeModal?: () => 
 export const TabDictionary: VFC = () => {
     const { settings, updateSetting } = useSettings();
     const [state, setState] = useState<DictionaryState | null>(null);
+    const [romaji, setRomaji] = useState(getShowRomaji);
     const mounted = useRef(true);
 
     const refresh = useCallback(async () => {
@@ -340,6 +343,22 @@ export const TabDictionary: VFC = () => {
                         onClick={() => showModal(<ImportUrlModal onSubmit={(url) => act('dictionary_install_url', url)} />)}
                     >
                         Install from URL
+                    </ButtonItem>
+                </PanelSectionRow>
+            </PanelSection>
+
+            <PanelSection title="Learning Aids">
+                <PanelSectionRow>
+                    <ToggleField
+                        label="Show romaji"
+                        description="Romaji under each reading and pitch accent, for learners who can't read kana yet"
+                        checked={romaji}
+                        onChange={(value) => { setRomaji(value); setShowRomaji(value); }}
+                    />
+                </PanelSectionRow>
+                <PanelSectionRow>
+                    <ButtonItem layout="below" onClick={() => showModal(<KanaChartModal />)}>
+                        Hiragana / katakana chart
                     </ButtonItem>
                 </PanelSectionRow>
             </PanelSection>
