@@ -125,6 +125,7 @@ class RapidOCRProvider(OCRProvider):
         self._box_thresh = 0.5  # Detection box threshold
         self._unclip_ratio = 1.6  # Box expansion ratio
         self._init_error = None  # Store any initialization error
+        self._last_warning = None  # Last unavailability reason logged
         self._python_path = None  # Path to system Python 3 interpreter
         self._logged_python_path: Optional[str] = None
 
@@ -160,6 +161,12 @@ class RapidOCRProvider(OCRProvider):
             f"(plugin_dir={self._plugin_dir}, min_confidence={min_confidence})"
         )
 
+    def _warn_once(self, message: str) -> None:
+        # The status panel polls this every 10 s; log a reason once, not on every poll
+        if message != self._last_warning:
+            self._last_warning = message
+            logger.warning(message)
+
     def _check_availability(self) -> bool:
         """Check if RapidOCR subprocess script and models are available."""
         self._init_error = None  # Clear any previous error
@@ -167,7 +174,7 @@ class RapidOCRProvider(OCRProvider):
         # Check if subprocess script exists
         if not os.path.exists(self._subprocess_script):
             self._init_error = f"RapidOCR subprocess script not found: {self._subprocess_script}"
-            logger.warning(self._init_error)
+            self._warn_once(self._init_error)
             return False
 
         det_model = os.path.join(self._models_dir, "ch_PP-OCRv5_mobile_det.onnx")
@@ -177,7 +184,7 @@ class RapidOCRProvider(OCRProvider):
                 "RapidOCR models not downloaded. Open the plugin settings, "
                 "select the RapidOCR provider, and download the models."
             )
-            logger.warning(self._init_error)
+            self._warn_once(self._init_error)
             return False
 
         # Find Python 3.13 interpreter (bundled, then system fallback)
@@ -189,12 +196,13 @@ class RapidOCRProvider(OCRProvider):
                 "Python 3.13 runtime missing. Reinstall the plugin to restore "
                 "the bundled runtime, or install python3.13 on your system."
             )
-            logger.warning(self._init_error)
+            self._warn_once(self._init_error)
             return False
 
         if self._python_path != self._logged_python_path:
             logger.debug(f"RapidOCR: Using Python interpreter: {self._python_path}")
             self._logged_python_path = self._python_path
+        self._last_warning = None  # so a later problem is logged again
         return True
 
     @property
