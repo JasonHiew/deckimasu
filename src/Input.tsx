@@ -60,7 +60,7 @@ export interface ProgressInfo {
 }
 
 // Buttons used to navigate the overlay and dictionary popup
-export type NavButton = 'up' | 'down' | 'left' | 'right' | 'a' | 'b' | 'x' | 'y' | 'l1' | 'r1';
+export type NavButton = 'up' | 'down' | 'left' | 'right' | 'a' | 'b' | 'x' | 'y' | 'l1' | 'r1' | 'select' | 'start';
 
 const NAV_BUTTON_MAP: Record<string, NavButton> = {
     'DPAD_UP': 'up',
@@ -82,6 +82,8 @@ const NAV_BUTTON_MAP: Record<string, NavButton> = {
     'Y': 'y',
     'L1': 'l1',
     'R1': 'r1',
+    'SELECT': 'select',
+    'START': 'start',
 };
 
 // Mapping from hidraw button names to Button enum

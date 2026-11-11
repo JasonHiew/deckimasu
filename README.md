@@ -77,6 +77,7 @@ The popup shows the box's recognized text at the top; tap a character to look up
 
 - **Install dictionaries** from the Dictionary tab in one step: JMdict (English), JMnedict (names), Jiten frequency and Kanjium pitch accents. That is about 35 MB to download and 230 MB on disk. The Kanjium pitch dictionary ships inside the plugin, so it installs without downloading. Other Yomitan-format dictionaries can be added from a [.zip file](#installing-a-dictionary-from-a-zip) or a URL.
 - Dictionaries can be reordered, disabled, deleted and updated. Updatable ones are checked automatically (weekly by default). Downloads show their size, speed and time left, and retry if the connection stalls.
+- **Learning aids** (Dictionary tab): **Show romaji** adds romaji under each reading and under the pitch graph's syllables, and **Hiragana / katakana chart** opens a kana table with romaji.
 - **Pitch accent** is drawn as a graph under the word: a dot per mora, high or low, joined by lines so each rise or drop is a diagonal. The hollow dot after the word is the following particle (が, は). It tells 平板 (stays high: はし [0] 端) from 尾高 (drops onto the particle: はし [2] 橋). The number is the mora the pitch drops after.
 
 ### Installing a dictionary from a .zip
@@ -127,6 +128,8 @@ Controller navigation can be turned off under Controls → Controller Navigation
 | Dictionary | X | Send the box's text to your phone |
 | Dictionary | Y | Send the picked entry's word (dictionary form only) |
 | Dictionary | B | Back after following a cross-reference, otherwise close |
+| Dictionary | Select | Move the popup to the other side (also the ⇄ button); in the Wide size, between top and bottom (⇅) |
+| Dictionary | Start | Change the popup size: ½, ⅓ or ⅔ of the screen's width, or Wide: full width and about half the height, at the top or bottom, so captions stay visible. Remembered for next time |
 
 The same controls work in the dictionary opened from the Bookmarks tab and from cached translations.
 

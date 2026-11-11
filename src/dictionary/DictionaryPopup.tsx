@@ -10,6 +10,7 @@ import { logger } from "../Logger";
 import type { NavButton } from "../Input";
 import { Glossary } from "./StructuredContent";
 import { PitchGraph } from "./PitchAccent";
+import { getShowRomaji, toRomaji } from "./romaji";
 import { Bookmark, DictionaryDefinition, DictionaryEntry, DictionaryJobStatus, DictionaryTag, LookupResult, bookmarkKey, progressFill } from "./types";
 
 type HistoryItem =
@@ -25,6 +26,26 @@ const TAG_COLORS: Record<string, string> = {
     name: '#8a3a64',
     expression: '#4d6f2a',
 };
+
+// Popup size presets, cycled with the size button or Start. The last one
+// leaves the bottom of the screen free for captions and subtitles.
+const LAYOUTS: { label: string; width: string; maxHeight: string; narrow?: boolean; wide?: boolean }[] = [
+    { label: '½', width: 'min(600px, 48vw)', maxHeight: 'calc(100vh - 24px)' },
+    { label: '⅓', width: '33vw', maxHeight: 'calc(100vh - 24px)', narrow: true },
+    { label: '⅔', width: '66vw', maxHeight: 'calc(100vh - 24px)' },
+    // Full width, docked to the top or bottom edge; swapping moves it between them
+    { label: 'Wide', width: 'calc(100vw - 24px)', maxHeight: '58vh', wide: true },
+];
+const LAYOUT_KEY = 'decky-ocr-notify.popupLayout';
+
+function loadLayout(): number {
+    try {
+        const i = parseInt(localStorage.getItem(LAYOUT_KEY) || '0', 10);
+        return i >= 0 && i < LAYOUTS.length ? i : 0;
+    } catch {
+        return 0;
+    }
+}
 
 const BUTTON_STYLE: CSSProperties = {
     display: 'inline-flex',
@@ -73,7 +94,7 @@ const Tag: VFC<{ tag: DictionaryTag }> = ({ tag }) => (
 const Headword: VFC<{ entry: DictionaryEntry }> = ({ entry }) => {
     const hasRuby = entry.furigana.some(([, ruby]) => ruby.length > 0);
     return (
-        <span lang="ja" style={{ fontSize: '30px', lineHeight: hasRuby ? '1.5' : '1.2' }}>
+        <span lang="ja" style={{ fontSize: '30px', lineHeight: hasRuby ? '1.5' : '1.2', whiteSpace: 'nowrap' }}>
             {entry.furigana.map(([text, ruby], i) =>
                 ruby
                     ? <ruby key={i}>{text}<rt style={{ fontSize: '13px', opacity: 0.85 }}>{ruby}</rt></ruby>
@@ -107,7 +128,8 @@ const EntryView: VFC<{
     onSendWord: (entry: DictionaryEntry) => void;
     bookmarked: boolean;
     onToggleBookmark: (entry: DictionaryEntry) => void;
-}> = ({ entry, selected, elementRef, onLookupTerm, onSendWord, bookmarked, onToggleBookmark }) => {
+    showRomaji: boolean;
+}> = ({ entry, selected, elementRef, onLookupTerm, onSendWord, bookmarked, onToggleBookmark, showRomaji }) => {
     const [showForms, setShowForms] = useState(false);
     const groups = groupByDictionary(entry.definitions.filter(d => !d.isForms));
     const forms = entry.definitions.filter(d => d.isForms);
@@ -123,11 +145,14 @@ const EntryView: VFC<{
             borderLeft: selected ? '3px solid #4fc3f7' : '3px solid transparent',
             background: selected ? 'rgba(79, 195, 247, 0.07)' : undefined,
         }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px 8px' }}>
                 <div style={{ minWidth: 0 }}>
                     <Headword entry={entry} />
                     {entry.reading !== entry.term && !entry.furigana.some(([, r]) => r) && (
                         <span lang="ja" style={{ fontSize: '16px', marginLeft: '8px', opacity: 0.8 }}>{entry.reading}</span>
+                    )}
+                    {showRomaji && (
+                        <div style={{ fontSize: '14px', color: '#b8bcbf', letterSpacing: '0.02em' }}>{toRomaji(entry.reading)}</div>
                     )}
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
@@ -157,7 +182,7 @@ const EntryView: VFC<{
 
             {downsteps.length > 0 && (
                 <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', rowGap: '4px' }}>
-                    {downsteps.map(n => <PitchGraph key={n} reading={entry.reading} downstep={n} />)}
+                    {downsteps.map(n => <PitchGraph key={n} reading={entry.reading} downstep={n} showRomaji={showRomaji} />)}
                 </div>
             )}
 
@@ -238,6 +263,25 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
     const [result, setResult] = useState<LookupResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [installStatus, setInstallStatus] = useState<DictionaryJobStatus | null>(null);
+    // Placement on the overlay: starts away from the tapped box, can be swapped;
+    // the size preset is remembered between popups
+    const [popupSide, setPopupSide] = useState<'left' | 'right'>(side);
+    const [layoutIndex, setLayoutIndex] = useState(loadLayout);
+    // Read once per popup; toggled in the Dictionary tab
+    const [showRomaji] = useState(getShowRomaji);
+    const layout = LAYOUTS[layoutIndex];
+    // The wide layout swaps between top and bottom instead of left and right;
+    // it starts at the top, since captions are usually at the bottom
+    const [popupEdge, setPopupEdge] = useState<'top' | 'bottom'>('top');
+    const swapSide = () => {
+        if (layout.wide) setPopupEdge(e => (e === 'top' ? 'bottom' : 'top'));
+        else setPopupSide(s => (s === 'left' ? 'right' : 'left'));
+    };
+    const cycleLayout = () => setLayoutIndex(i => {
+        const next = (i + 1) % LAYOUTS.length;
+        try { localStorage.setItem(LAYOUT_KEY, String(next)); } catch { /* not persisted */ }
+        return next;
+    });
     const requestId = useRef(0);
     // The history item the shown result was looked up for. Until a new lookup
     // returns, the old result's match must not be drawn under the new cursor.
@@ -431,6 +475,12 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                 if (history.length > 1) goBack();
                 else onClose();
                 break;
+            case 'select':
+                if (!embedded) swapSide();
+                break;
+            case 'start':
+                if (!embedded) cycleLayout();
+                break;
         }
     };
 
@@ -444,7 +494,9 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
             style={{
                 ...(embedded
                     ? { position: 'relative', width: '100%', height: '100%' }
-                    : { position: 'fixed', top: '12px', [side]: '12px', width: 'min(600px, 48vw)', maxHeight: 'calc(100vh - 24px)', zIndex: 7010 }),
+                    : layout.wide
+                        ? { position: 'fixed', [popupEdge]: '12px', left: '12px', right: '12px', maxHeight: layout.maxHeight, zIndex: 7010 }
+                        : { position: 'fixed', top: '12px', [popupSide]: '12px', width: layout.width, maxHeight: layout.maxHeight, zIndex: 7010 }),
                 display: 'flex',
                 flexDirection: 'column',
                 background: 'rgba(22, 24, 30, 0.97)',
@@ -503,13 +555,24 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                 {history.length > 1 && (
                     <div style={BUTTON_STYLE} onClick={goBack}>‹ Back</div>
                 )}
-                <div style={BUTTON_STYLE} onClick={() => onSendText(text)}>
-                    <SendIcon /> Send to phone
+                {/* Icon only in the narrow layout, so the action row stays on one line */}
+                <div style={BUTTON_STYLE} onClick={() => onSendText(text)} title="Send to phone">
+                    <SendIcon />{!(layout.narrow && !embedded) && ' Send to phone'}
                 </div>
                 {current.kind === 'term' && (
                     <span lang="ja" style={{ fontSize: '14px', opacity: 0.75 }}>{current.term}</span>
                 )}
                 <div style={{ flex: 1 }} />
+                {!embedded && (
+                    <>
+                        <div style={{ ...BUTTON_STYLE, padding: '6px 10px' }} onClick={swapSide}
+                             title={layout.wide ? 'Move to the other edge' : 'Move to the other side'}>
+                            {layout.wide ? '⇅' : '⇄'}
+                        </div>
+                        <div style={{ ...BUTTON_STYLE, padding: '6px 10px', minWidth: '28px', justifyContent: 'center' }}
+                             onClick={cycleLayout} title="Change size">{layout.label}</div>
+                    </>
+                )}
                 {loading && <div className="loader" style={{
                     border: '2px solid #f3f3f3', borderTop: '2px solid #3498db', borderRadius: '50%',
                     width: '14px', height: '14px', animation: 'dtDictSpin 1.2s linear infinite',
@@ -559,6 +622,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                             onSendWord={(e) => onSendWord(e.term)}
                             bookmarked={bookmarks.has(bookmarkKey(entry.term, entry.reading))}
                             onToggleBookmark={toggleBookmark}
+                            showRomaji={showRomaji}
                         />
                     ))
                 )}
@@ -584,6 +648,8 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                     <span><HintKey label="X" />send text</span>
                     <span><HintKey label="Y" />send word</span>
                     <span><HintKey label="B" />{history.length > 1 ? 'back' : 'close'}</span>
+                    {!embedded && <span><HintKey label="Select" />side</span>}
+                    {!embedded && <span><HintKey label="Start" />size</span>}
                 </div>
             )}
         </div>
