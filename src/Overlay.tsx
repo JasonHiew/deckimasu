@@ -6,6 +6,7 @@ import { findModuleChild } from "@decky/ui";
 import { VFC, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { TranslatedRegion } from "./TextTranslator";
 import { logger } from "./Logger";
+import { useIncognito } from "./incognito";
 import { buildTranslatedFontFamily, ensureFontLoaded, resolveFontStyleCSS } from "./fonts";
 import type { FontStyleOption } from "./fonts";
 import { DictionaryPopup, DictionaryPopupHandle } from "./dictionary/DictionaryPopup";
@@ -511,6 +512,7 @@ export const TranslatedTextOverlay: VFC<{
     onSendWord: (word: string) => void,
     navSource?: ImageState
 }> = ({ visible, imageData, regions, loading, processingStep, processingDetail, processingIsError, translationsVisible, fontScale, allowLabelGrowth, translatedTextAlignment, translatedTextFontFamily, translatedTextFontStyle, onSendRegion, onSendWord, navSource }) => {
+    const incognito = useIncognito();
     // Composition layer is handled by CompositionRequest below -- only mounted when visible
 
     // Ref to the screenshot image element
@@ -947,6 +949,24 @@ export const TranslatedTextOverlay: VFC<{
                                 <path d="M1 1l22 22" />
                                 <path d="M8.71 8.71a4 4 0 1 0 5.66 5.66" />
                             </svg>
+                        </div>
+                    )}
+
+                    {/* Incognito badge: what is read now is not kept */}
+                    {incognito && (
+                        <div style={{
+                            position: "absolute",
+                            top: "20px",
+                            left: "20px",
+                            background: "rgba(0, 0, 0, 0.7)",
+                            padding: '6px 12px',
+                            borderRadius: '14px',
+                            zIndex: 7003,
+                            color: '#b39ddb',
+                            fontSize: '13px',
+                            fontWeight: 'bold',
+                        }}>
+                            Incognito
                         </div>
                     )}
 

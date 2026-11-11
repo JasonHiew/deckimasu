@@ -91,7 +91,7 @@ import requests
 
 # Import provider system
 from providers import ProviderManager, TextRegion, NetworkError, ApiKeyError, RateLimitError
-from providers.translation_cache import TranslationCache, PROVIDER_TIERS, normalize
+from providers.translation_cache import TranslationCache, SessionCache, PROVIDER_TIERS, normalize
 from providers.ntfy_provider import NtfyProvider
 from providers.bookmarks import BookmarkStore
 from providers.dictionary.manager import DictionaryManager, ATTRIBUTION as DICTIONARY_ATTRIBUTION
@@ -162,6 +162,18 @@ class UrlKeyRedactFilter(logging.Filter):
 _url_redact_filter = UrlKeyRedactFilter()
 
 
+class IncognitoLogFilter(logging.Filter):
+    """While incognito is on, drop DEBUG records: those are the ones that
+    carry recognized or translated text."""
+    active = False
+
+    def filter(self, record):
+        return not (IncognitoLogFilter.active and record.levelno < logging.INFO)
+
+
+_incognito_log_filter = IncognitoLogFilter()
+
+
 # Get environment variable
 settingsDir = os.environ.get("DECKY_PLUGIN_SETTINGS_DIR", "/home/deck/homebrew/settings")
 
@@ -202,6 +214,10 @@ log_file = Path(DECKY_PLUGIN_LOG_DIR) / "decky-translator.log"
 log_file_handler = TimedRotatingFileHandler(log_file, when="midnight", backupCount=2)
 log_file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 log_file_handler.addFilter(_url_redact_filter)
+log_file_handler.addFilter(_incognito_log_filter)
+# Provider modules log through the root logger's handlers
+for _h in logging.getLogger().handlers:
+    _h.addFilter(_incognito_log_filter)
 logger.handlers.clear()
 logger.addHandler(log_file_handler)
 logger.setLevel(logging.INFO)
@@ -1349,6 +1365,9 @@ class Plugin:
     # Translation cache
     _translation_cache: TranslationCache = None
     _translation_cache_enabled: bool = True
+    # Incognito: new translations stay in RAM only, nothing about what was read is written to disk
+    _incognito: bool = False
+    _session_cache: SessionCache = None
 
     # Dictionary lookup (Yomitan-format dictionaries)
     _dictionary_manager: DictionaryManager = None
@@ -1655,6 +1674,8 @@ class Plugin:
                         self._provider_manager.resume_ct2_worker()
             elif key == "translation_cache_enabled":
                 self._translation_cache_enabled = bool(value)
+            elif key == "incognito":
+                self._set_incognito(bool(value))
             elif key == "ntfy_server_url":
                 pass  # persisted below, read fresh in send_ntfy_notification
             elif key == "ntfy_topic":
@@ -1712,6 +1733,7 @@ class Plugin:
                 "allow_label_growth": self._settings.get_setting("allow_label_growth", False),
                 "custom_recognition_settings": self._settings.get_setting("custom_recognition_settings", False),
                 "translation_cache_enabled": self._translation_cache_enabled,
+                "incognito": self._incognito,
                 "ntfy_server_url": self._settings.get_setting("ntfy_server_url", ""),
                 "ntfy_topic": self._settings.get_setting("ntfy_topic", ""),
                 "ntfy_token": self._settings.get_setting("ntfy_token", ""),
@@ -1786,6 +1808,7 @@ class Plugin:
             # Build filename
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
             os.makedirs(self._screenshotPath, exist_ok=True)
+            self._purge_stale_screenshots()
             screenshot_path = f"{self._screenshotPath}/{app_name}_{timestamp}.png"
             logger.debug(f"Screenshot path: {screenshot_path}")
 
@@ -2418,6 +2441,52 @@ class Plugin:
                 except Exception as cleanup_error:
                     logger.warning(f"Failed to delete temporary screenshot: {cleanup_error}")
 
+    def _purge_stale_screenshots(self, max_age=60):
+        """Screenshots are deleted after OCR; this catches any left behind when a
+        capture or OCR step failed before that."""
+        try:
+            cutoff = time.time() - max_age
+            for name in os.listdir(self._screenshotPath):
+                path = os.path.join(self._screenshotPath, name)
+                if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+        except OSError as e:
+            logger.warning(f"Could not purge old screenshots: {e}")
+
+    def _set_incognito(self, on):
+        self._incognito = on
+        IncognitoLogFilter.active = on
+        if on:
+            if self._session_cache is None:
+                self._session_cache = SessionCache()
+        elif self._session_cache is not None:
+            dropped = self._session_cache.clear()
+            self._session_cache = None
+            logger.info(f"Incognito off: dropped {dropped} session-only translations")
+
+    async def _cache_get(self, texts, source_lang, target_lang, min_tier):
+        """Reads the disk cache; in incognito it also reads the session cache and
+        leaves the disk rows untouched (no hit count or last-used time)."""
+        found = await asyncio.to_thread(
+            self._translation_cache.get_many,
+            texts, source_lang, target_lang, min_tier, not self._incognito,
+        )
+        if self._incognito and self._session_cache is not None:
+            missing = [t for t in texts if t not in found]
+            if missing:
+                found.update(self._session_cache.get_many(missing, source_lang, target_lang, min_tier))
+        return found
+
+    async def _cache_put(self, pairs, source_lang, target_lang, provider):
+        tier = PROVIDER_TIERS.get(provider, 0)
+        if self._incognito:
+            if self._session_cache is not None:
+                self._session_cache.put_many(pairs, source_lang, target_lang, tier)
+            return
+        await asyncio.to_thread(
+            self._translation_cache.put_many, pairs, source_lang, target_lang, tier, provider,
+        )
+
     async def translate_text(self, text_regions, target_language=None, input_language=None):
         try:
             if not text_regions:
@@ -2438,11 +2507,7 @@ class Plugin:
                         and self._ocr_provider == "gemini_vision"):
                     pairs = [(r["text"], r["translatedText"]) for r in text_regions]
                     if any(normalize(s) != normalize(t) for s, t in pairs):
-                        await asyncio.to_thread(
-                            self._translation_cache.put_many,
-                            pairs, input_lang, target_lang,
-                            PROVIDER_TIERS.get("gemini_vision", 0), "gemini_vision",
-                        )
+                        await self._cache_put(pairs, input_lang, target_lang, "gemini_vision")
                 return text_regions
 
             # Check if CT2 provider has the needed models
@@ -2464,10 +2529,7 @@ class Plugin:
 
             cached = {}
             if cache_on and texts_to_translate:
-                cached = await asyncio.to_thread(
-                    self._translation_cache.get_many,
-                    texts_to_translate, input_lang, target_lang, provider_tier,
-                )
+                cached = await self._cache_get(texts_to_translate, input_lang, target_lang, provider_tier)
 
             if cache_on:
                 to_request, seen = [], set()
@@ -2490,10 +2552,7 @@ class Plugin:
             # Failed items come back as None
             translated = [(s, t) for s, t in zip(to_request, requested) if t is not None]
             if cache_on and any(normalize(s) != normalize(t) for s, t in translated):
-                await asyncio.to_thread(
-                    self._translation_cache.put_many,
-                    translated, input_lang, target_lang, provider_tier, self._translation_provider,
-                )
+                await self._cache_put(translated, input_lang, target_lang, self._translation_provider)
 
             # A failed item shows its original text.
             result_map = {s: (t if t is not None else s) for s, t in zip(to_request, requested)}
@@ -3030,6 +3089,7 @@ class Plugin:
             self._translation_cache_enabled = bool(
                 load_setting("translation_cache_enabled", self._translation_cache_enabled)
             )
+            self._set_incognito(bool(load_setting("incognito", False)))
 
             os.makedirs(self._screenshotPath, exist_ok=True)
 
@@ -3219,6 +3279,8 @@ class Plugin:
             if self._translation_cache:
                 self._translation_cache.close()
                 self._translation_cache = None
+            if self._session_cache:
+                self._session_cache.clear()
 
             if self._dictionary_manager:
                 self._dictionary_manager.shutdown()

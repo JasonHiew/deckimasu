@@ -11,6 +11,7 @@ import type { NavButton } from "../Input";
 import { Glossary } from "./StructuredContent";
 import { PitchGraph } from "./PitchAccent";
 import { getShowRomaji, toRomaji } from "./romaji";
+import { isIncognito } from "../incognito";
 import { Bookmark, DictionaryDefinition, DictionaryEntry, DictionaryJobStatus, DictionaryTag, LookupResult, bookmarkKey, progressFill } from "./types";
 
 type HistoryItem =
@@ -127,9 +128,10 @@ const EntryView: VFC<{
     onLookupTerm: (term: string) => void;
     onSendWord: (entry: DictionaryEntry) => void;
     bookmarked: boolean;
+    confirmingSave: boolean;
     onToggleBookmark: (entry: DictionaryEntry) => void;
     showRomaji: boolean;
-}> = ({ entry, selected, elementRef, onLookupTerm, onSendWord, bookmarked, onToggleBookmark, showRomaji }) => {
+}> = ({ entry, selected, elementRef, onLookupTerm, onSendWord, bookmarked, confirmingSave, onToggleBookmark, showRomaji }) => {
     const [showForms, setShowForms] = useState(false);
     const groups = groupByDictionary(entry.definitions.filter(d => !d.isForms));
     const forms = entry.definitions.filter(d => d.isForms);
@@ -156,9 +158,9 @@ const EntryView: VFC<{
                     )}
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                    <div style={{ ...BUTTON_STYLE, padding: '4px 10px', fontSize: '12px', color: bookmarked ? '#ffc107' : '#fff' }}
+                    <div style={{ ...BUTTON_STYLE, padding: '4px 10px', fontSize: '12px', color: bookmarked || confirmingSave ? '#ffc107' : '#fff' }}
                          onClick={() => onToggleBookmark(entry)}>
-                        {bookmarked ? '★ Saved' : '☆ Save'}
+                        {bookmarked ? '★ Saved' : confirmingSave ? 'Save anyway?' : '☆ Save'}
                     </div>
                     <div style={{ ...BUTTON_STYLE, padding: '4px 10px', fontSize: '12px' }}
                          onClick={() => onSendWord(entry)}>
@@ -357,9 +359,22 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
             .catch(e => logger.error('Dictionary', 'Failed to load bookmarks', e));
     }, []);
 
+    // In incognito, saving a word takes a second press within a few seconds
+    const [confirmSaveKey, setConfirmSaveKey] = useState<string | null>(null);
+    useEffect(() => {
+        if (!confirmSaveKey) return;
+        const timer = setTimeout(() => setConfirmSaveKey(null), 4000);
+        return () => clearTimeout(timer);
+    }, [confirmSaveKey]);
+
     const toggleBookmark = async (entry: DictionaryEntry) => {
         const key = bookmarkKey(entry.term, entry.reading);
         const saved = bookmarks.has(key);
+        if (!saved && isIncognito() && confirmSaveKey !== key) {
+            setConfirmSaveKey(key);
+            return;
+        }
+        setConfirmSaveKey(null);
         try {
             const res = saved
                 ? await call<[string, string], { success: boolean; message?: string }>('bookmark_delete_term', entry.term, entry.reading)
@@ -621,6 +636,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                             onLookupTerm={lookupTerm}
                             onSendWord={(e) => onSendWord(e.term)}
                             bookmarked={bookmarks.has(bookmarkKey(entry.term, entry.reading))}
+                            confirmingSave={confirmSaveKey === bookmarkKey(entry.term, entry.reading)}
                             onToggleBookmark={toggleBookmark}
                             showRomaji={showRomaji}
                         />

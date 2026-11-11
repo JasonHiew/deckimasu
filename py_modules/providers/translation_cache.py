@@ -54,7 +54,8 @@ class TranslationCache:
             self._conn.execute("ALTER TABLE translations ADD COLUMN source_text TEXT")
         self._conn.commit()
 
-    def get_many(self, texts, source_lang, target_lang, min_tier):
+    def get_many(self, texts, source_lang, target_lang, min_tier, touch=True):
+        """touch=False reads without updating hit_count/last_used_at (incognito)."""
         norm_by_input = {}
         for text in texts:
             if text and text.strip():
@@ -74,7 +75,7 @@ class TranslationCache:
                 [source_lang, target_lang, min_tier, *unique_norms],
             ).fetchall()
 
-            if rows:
+            if rows and touch:
                 hit_norms = [r[0] for r in rows]
                 hit_placeholders = ",".join("?" for _ in hit_norms)
                 self._conn.execute(
@@ -189,3 +190,49 @@ class TranslationCache:
     def close(self):
         with self._lock:
             self._conn.close()
+
+
+# Cap for the incognito session cache; the oldest entries go first
+SESSION_MAX_ROWS = 5000
+
+
+class SessionCache:
+    """RAM-only translation cache used in incognito mode. Nothing touches disk;
+    it is emptied when incognito is turned off or the plugin unloads."""
+
+    def __init__(self):
+        self._rows = {}  # (source_lang, target_lang, norm) -> (translation, tier)
+        self._lock = threading.Lock()
+
+    def get_many(self, texts, source_lang, target_lang, min_tier):
+        out = {}
+        with self._lock:
+            for text in texts:
+                if not text or not text.strip():
+                    continue
+                hit = self._rows.get((source_lang, target_lang, normalize(text)))
+                if hit and hit[1] >= min_tier:
+                    out[text] = hit[0]
+        return out
+
+    def put_many(self, pairs, source_lang, target_lang, tier):
+        with self._lock:
+            for text, translation in pairs:
+                if not text or not text.strip() or not translation:
+                    continue
+                key = (source_lang, target_lang, normalize(text))
+                old = self._rows.get(key)
+                if old is None or tier > old[1]:
+                    self._rows.pop(key, None)
+                    self._rows[key] = (translation, tier)
+            while len(self._rows) > SESSION_MAX_ROWS:
+                self._rows.pop(next(iter(self._rows)))
+
+    def clear(self):
+        with self._lock:
+            count = len(self._rows)
+            self._rows.clear()
+        return count
+
+    def __len__(self):
+        return len(self._rows)

@@ -4,6 +4,7 @@ import { call } from '@decky/api';
 import { GameTranslatorLogic } from './Translator';
 import { InputMode } from './Input';
 import { logger } from './Logger';
+import { setIncognito } from './incognito';
 
 // Define the settings interface
 export interface Settings {
@@ -39,6 +40,7 @@ export interface Settings {
     allowLabelGrowth: boolean;
     customRecognitionSettings: boolean;
     translationCacheEnabled: boolean;
+    incognito: boolean; // New translations stay in RAM, no debug logs, bookmark Save asks first
     ntfyServerUrl: string; // ntfy server URL (e.g. https://ntfy.example.com)
     ntfyTopic: string; // ntfy topic name
     ntfyToken: string; // ntfy access token, if the topic requires auth
@@ -87,6 +89,7 @@ const initialSettings: Settings = {
     allowLabelGrowth: false,
     customRecognitionSettings: false,
     translationCacheEnabled: true,
+    incognito: false,
     ntfyServerUrl: "",
     ntfyTopic: "",
     ntfyToken: "",
@@ -170,6 +173,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                     allowLabelGrowth: serverSettings.allow_label_growth ?? false,
                     customRecognitionSettings: serverSettings.custom_recognition_settings ?? false,
                     translationCacheEnabled: serverSettings.translation_cache_enabled ?? true,
+                    incognito: serverSettings.incognito ?? false,
                     ntfyServerUrl: serverSettings.ntfy_server_url || "",
                     ntfyTopic: serverSettings.ntfy_topic || "",
                     ntfyToken: serverSettings.ntfy_token || "",
@@ -207,6 +211,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                 logic.setHideIdenticalTranslations(serverSettings.hide_identical_translations ?? false);
                 logic.setAllowLabelGrowth(serverSettings.allow_label_growth ?? false);
                 logic.setOverlayControllerNavigation(serverSettings.overlay_controller_navigation ?? true);
+                setIncognito(serverSettings.incognito ?? false);
 
                 logger.info('SettingsContext', 'All settings loaded successfully');
                 logger.logObject('SettingsContext', 'Settings', mappedSettings);
@@ -260,6 +265,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                 allowLabelGrowth: 'allow_label_growth',
                 customRecognitionSettings: 'custom_recognition_settings',
                 translationCacheEnabled: 'translation_cache_enabled',
+                incognito: 'incognito',
                 ntfyServerUrl: 'ntfy_server_url',
                 ntfyTopic: 'ntfy_topic',
                 ntfyToken: 'ntfy_token',
@@ -328,6 +334,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                     break;
                 case 'overlayControllerNavigation':
                     logic.setOverlayControllerNavigation(value);
+                    break;
+                case 'incognito':
+                    setIncognito(value);
                     break;
                 case 'ocrProvider':
                     logic.setOcrProvider(value);

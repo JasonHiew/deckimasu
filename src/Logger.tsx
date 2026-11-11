@@ -4,6 +4,8 @@
  * Logging can be enabled/disabled via debug mode
  */
 
+import { isIncognito } from './incognito';
+
 export enum LogLevel {
     DEBUG = 'DEBUG',
     INFO = 'INFO',
@@ -52,6 +54,10 @@ class Logger {
     private log(level: LogLevel, component: string, message: string, ...args: any[]): void {
         // Always log errors, otherwise check if enabled
         if (!this._enabled && level !== LogLevel.ERROR) {
+            return;
+        }
+        // Debug output can carry caption text; keep it out while incognito
+        if (isIncognito() && level !== LogLevel.ERROR) {
             return;
         }
 

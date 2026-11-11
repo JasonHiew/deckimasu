@@ -145,6 +145,19 @@ export const TabMain: VFC<TabMainProps> = ({ logic, overlayVisible, providerStat
                 </PanelSectionRow>
 
                 {settings.enabled && (
+                    <PanelSectionRow>
+                        <ToggleField
+                            label="Incognito"
+                            description={settings.incognito
+                                ? "New translations stay in memory and are forgotten when you turn this off. Nothing you read is logged."
+                                : "Don't keep a record of what you read"}
+                            checked={settings.incognito}
+                            onChange={(value) => updateSetting('incognito', value, 'Incognito')}
+                        />
+                    </PanelSectionRow>
+                )}
+
+                {settings.enabled && (
                     <>
                         <PanelSectionRow>
                             <ButtonItem
