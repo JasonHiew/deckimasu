@@ -20,6 +20,9 @@ _SKIP_CHARS = set(" \t\r\n　")
 
 _NO_FREQUENCY = float("inf")
 
+# Particles a set phrase can end in (今日は, 今晩は); see LookupEngine.annotate
+_PARTICLES = set("はがをにでともへの")
+
 
 class _Deinflection:
     __slots__ = ("original_text", "transformed_text", "deinflected_text", "conditions",
@@ -75,6 +78,93 @@ class LookupEngine:
         result["entries"] = entries
         result["elapsedMs"] = round((time.perf_counter() - started) * 1000, 1)
         return result
+
+    def annotate(self, text):
+        """
+        Furigana for running text: greedy longest dictionary match at each position,
+        reading from the best-ranked entry. Returns [[text, ruby], ...] covering text
+        exactly; ruby is '' where there is none. No tokenizer, so readings of words
+        with several readings and of names can be wrong.
+        """
+        out = []
+
+        def emit(seg_text, ruby=""):
+            if not seg_text:
+                return
+            if not ruby and out and not out[-1][1]:
+                out[-1][0] += seg_text
+            else:
+                out.append([seg_text, ruby])
+
+        for line_no, line in enumerate(text.split("\n")):
+            if line_no:
+                emit("\n")
+            i = 0
+            while i < len(line):
+                c = line[i]
+                window = line[i:i + DEFAULT_SCAN_LENGTH]
+                if (not japanese.is_code_point_japanese(ord(c))
+                        or not any(japanese.is_code_point_kanji(ord(ch)) for ch in window)):
+                    emit(c)
+                    i += 1
+                    continue
+                res = self.lookup(line, i, max_results=4)
+                end = res["matchEnd"]
+                surface = line[i:end]
+                # Set phrases that swallow a particle (今日は こんにちは) win the longest
+                # match; take the word without the particle when it is far more common
+                if (res["entries"] and len(surface) > 1 and surface[-1] in _PARTICLES
+                        and surface[:-1].strip()):
+                    shorter = self.lookup(line[:end - 1], i, max_results=4)
+                    if (shorter["entries"] and shorter["matchEnd"] == end - 1
+                            and self._best_rank(shorter["entries"]) < self._best_rank(res["entries"])):
+                        res, end, surface = shorter, end - 1, line[i:end - 1]
+                if not res["entries"] or end <= i or any(ch in _SKIP_CHARS for ch in surface):
+                    emit(c)
+                    i += 1
+                    continue
+                for seg_text, ruby in self._align_furigana(res["entries"], surface):
+                    emit(seg_text, ruby)
+                i = end
+        return out
+
+    @staticmethod
+    def _written_rank(entry):
+        """Best frequency rank of the word as written with kanji. Jiten marks ranks
+        of the kana spelling with ㋕ (彼 as あれ is common only in kana), and those
+        say nothing about how text written in kanji is read."""
+        ranks = [f["value"] for f in entry["frequencies"]
+                 if isinstance(f.get("value"), (int, float)) and "㋕" not in str(f.get("displayValue", ""))]
+        return min(ranks) if ranks else _NO_FREQUENCY
+
+    @classmethod
+    def _best_rank(cls, entries):
+        longest = max(e["matchLength"] for e in entries)
+        return min(cls._written_rank(e) for e in entries if e["matchLength"] == longest)
+
+    @staticmethod
+    def _align_furigana(entries, surface):
+        """Lays the best entry's furigana over the matched text. Inflected endings
+        that differ from the dictionary form are left without ruby."""
+        has_kanji = any(japanese.is_code_point_kanji(ord(ch)) for ch in surface)
+        if not has_kanji:
+            return [[surface, ""]]
+        # Among entries written like the text, the most common written form; ties
+        # keep the lookup's own order
+        longest = max(e["matchLength"] for e in entries)
+        full = [e for e in entries if e["matchLength"] == longest]
+        same = [e for e in full if e["term"][:1] == surface[:1]] or full
+        entry = min(same, key=LookupEngine._written_rank)
+        segments, pos = [], 0
+        for seg_text, ruby in entry["furigana"]:
+            if surface.startswith(seg_text, pos):
+                segments.append([seg_text, ruby])
+                pos += len(seg_text)
+            else:
+                break
+        if pos < len(surface):
+            segments.append([surface[pos:], ""])
+        return segments
 
     def find_terms(self, text, max_results=DEFAULT_MAX_RESULTS):
         """Returns (grouped_entries, longest_matched_source_length)."""

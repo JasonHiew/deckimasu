@@ -2630,6 +2630,22 @@ class Plugin:
             logger.error(traceback.format_exc())
             return {"success": False, "error": "lookup_error", "message": str(e), "entries": []}
 
+    async def dictionary_annotate(self, texts):
+        """Furigana for overlay captions: one [[text, ruby], ...] list per input text."""
+        if not self._dictionary_manager or not self._dictionary_manager.has_term_dictionaries():
+            return {"success": False, "error": "unavailable"}
+        try:
+            started = time.time()
+            results = await asyncio.to_thread(
+                lambda: [self._dictionary_manager.annotate(t or "") for t in texts]
+            )
+            logger.info(f"Annotated {len(texts)} captions in {(time.time() - started) * 1000:.0f} ms")
+            return {"success": True, "results": results}
+        except Exception as e:
+            logger.error(f"Dictionary annotate failed: {e}")
+            logger.error(traceback.format_exc())
+            return {"success": False, "error": "annotate_error", "message": str(e)}
+
     async def dictionary_get_state(self):
         if not self._dictionary_manager:
             return {"available": False}

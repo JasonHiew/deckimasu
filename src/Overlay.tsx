@@ -10,6 +10,7 @@ import { useIncognito } from "./incognito";
 import { buildTranslatedFontFamily, ensureFontLoaded, resolveFontStyleCSS } from "./fonts";
 import type { FontStyleOption } from "./fonts";
 import { DictionaryPopup, DictionaryPopupHandle } from "./dictionary/DictionaryPopup";
+import { FuriganaSegments, annotateTexts, getShowFurigana } from "./dictionary/furigana";
 import type { NavButton } from "./Input";
 
 export type HorizontalTextAlignment = 'left' | 'right' | 'center' | 'justify';
@@ -405,7 +406,11 @@ function textWidthEm(line: string): number {
 // Font size for showing a box's recognized (original) text. Keeps the OCR's
 // own line breaks and makes the lines fill the box the way they do in the game,
 // so the text sits close to where it is on screen (and where taps land).
-function calculateOriginalFontSize(region: TranslatedRegion, scalingFactor: number, fontScale: number): number {
+// Furigana are drawn at half size above each line; this much of an em is kept
+// free above the base text for them
+const RUBY_ROOM_EM = 0.6;
+
+function calculateOriginalFontSize(region: TranslatedRegion, scalingFactor: number, fontScale: number, withRuby = false): number {
     const lines = region.text.split('\n');
     // The OCR box hugs the characters' ink, which for Japanese is about one em
     // per line, so no room for line spacing is taken off (the label is drawn
@@ -414,7 +419,10 @@ function calculateOriginalFontSize(region: TranslatedRegion, scalingFactor: numb
     const boxHeight = (region.rect.bottom - region.rect.top) * scalingFactor;
     if (boxWidth <= 0 || boxHeight <= 0) return 7;
     const widestEm = Math.max(1, ...lines.map(textWidthEm));
-    const fontSize = Math.min(boxHeight / lines.length, boxWidth / widestEm) * fontScale;
+    // With furigana the first line's readings sit above the box (the label is
+    // moved up), so only the gaps between lines need room
+    const heightEm = lines.length + (withRuby ? RUBY_ROOM_EM * (lines.length - 1) : 0);
+    const fontSize = Math.min(boxHeight / heightEm, boxWidth / widestEm) * fontScale;
     return Math.max(7, Math.min(fontSize, 64));
 }
 
@@ -526,6 +534,27 @@ export const TranslatedTextOverlay: VFC<{
 
     // Whether boxes show the original recognized text instead of the translation
     const [showOriginalText, setShowOriginalText] = useState(false);
+
+    // Furigana for original text, by caption; fetched when original text is shown
+    const [furigana, setFurigana] = useState<Record<string, FuriganaSegments>>({});
+    useEffect(() => {
+        if (!getShowFurigana()) return;
+        const wanted = Array.from(new Set(regions
+            .filter(r => (showOriginalText || !r.translatedText) && /[\u4e00-\u9fff\u3400-\u4dbf\u3005]/.test(r.text))
+            .map(r => r.text)
+            .filter(t => !(t in furigana))));
+        if (wanted.length === 0) return;
+        let cancelled = false;
+        annotateTexts(wanted).then(results => {
+            if (cancelled || !results) return;
+            setFurigana(prev => {
+                const next = { ...prev };
+                wanted.forEach((t, i) => { if (results[i]) next[t] = results[i]; });
+                return next;
+            });
+        });
+        return () => { cancelled = true; };
+    }, [regions, showOriginalText]);
 
     // Dictionary popup for the tapped box; key forces a fresh popup per tap
     const [lookup, setLookup] = useState<{ index: number; offset: number; side: 'left' | 'right'; key: number; viaController: boolean } | null>(null);
@@ -711,6 +740,7 @@ export const TranslatedTextOverlay: VFC<{
         return () => navSource.offNav(listener);
     }, [navSource]);
 
+
     return (
         <>
         {visible && <CompositionRequest level={UIComposition.Overlay} />}
@@ -802,8 +832,10 @@ export const TranslatedTextOverlay: VFC<{
                             // The original text is sized from itself and keeps its line breaks;
                             // sizing it from the (longer) translation shrank and re-wrapped it
                             const showingOriginal = showOriginalText || !region.translatedText;
+                            const rubySegments = showingOriginal && getShowFurigana() ? furigana[region.text] : undefined;
+                            const withRuby = !!rubySegments?.some(([, r]) => r);
                             const fontSize = showingOriginal
-                                ? calculateOriginalFontSize(region, generalFactor, fontScale)
+                                ? calculateOriginalFontSize(region, generalFactor, fontScale, withRuby)
                                 : calculateFontSize(region, generalFactor, fontScale);
                             let displayText = showingOriginal ? region.text : region.translatedText;
 
@@ -878,12 +910,13 @@ export const TranslatedTextOverlay: VFC<{
                                         justifyContent: alignmentStyles.justifyContent,
                                         alignItems: 'center',
                                         ...positionStyles,
-                                        top: `${scaled[index].top}px`,
+                                        // Readings of the first line go above the box, so the base text stays on the game's
+                                        top: `${scaled[index].top - (withRuby ? Math.round(fontSize * RUBY_ROOM_EM) : 0)}px`,
                                         minWidth: `${scaled[index].width}px`,
                                         ...(useMaxContentWidth
                                             ? { width: 'max-content', maxWidth: `${labelMaxWidth}px` }
                                             : { maxWidth: `${labelMaxWidth}px` }),
-                                        minHeight: `${scaled[index].height}px`,
+                                        minHeight: `${scaled[index].height + (withRuby ? Math.round(fontSize * RUBY_ROOM_EM) : 0)}px`,
                                         boxSizing: 'border-box',
 
                                         backgroundColor: "rgba(0, 0, 0, 0.8)",
@@ -896,7 +929,7 @@ export const TranslatedTextOverlay: VFC<{
                                         borderRadius: `${Math.round(6 * generalFactor)}px`,
 
                                         fontSize: `${Math.round(fontSize)}px`,
-                                        lineHeight: '1.15',
+                                        lineHeight: withRuby ? '1' : '1.15',
                                         ...resolveFontStyleCSS(translatedTextFontStyle),
                                         fontFamily: translatedOverlayFontFamily,
 
@@ -912,7 +945,11 @@ export const TranslatedTextOverlay: VFC<{
                                         textAlign: alignmentStyles.textAlign,
                                         textAlignLast: translatedTextAlignment === 'justify' ? 'justify' : alignmentStyles.textAlign,
                                     }}>
-                                        {displayText}
+                                        {withRuby
+                                            ? rubySegments!.map(([text, ruby], i) => ruby
+                                                ? <ruby key={i}>{text}<rt style={{ fontSize: '0.5em', lineHeight: 1, opacity: 0.9 }}>{ruby}</rt></ruby>
+                                                : <span key={i}>{text}</span>)
+                                            : displayText}
                                     </div>
                                 </div>
                             );

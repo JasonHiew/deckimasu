@@ -21,6 +21,7 @@ import { logger } from "../Logger";
 import { DictionaryState, InstalledDictionary, progressFill } from "../dictionary/types";
 import { getShowRomaji, setShowRomaji } from "../dictionary/romaji";
 import { KanaChartModal } from "../dictionary/KanaChartModal";
+import { getShowFurigana, setShowFurigana } from "../dictionary/furigana";
 
 const autoUpdateOptions = [
     { label: "Never", data: 0 },
@@ -179,6 +180,7 @@ export const TabDictionary: VFC = () => {
     const { settings, updateSetting } = useSettings();
     const [state, setState] = useState<DictionaryState | null>(null);
     const [romaji, setRomaji] = useState(getShowRomaji);
+    const [furigana, setFurigana] = useState(getShowFurigana);
     const mounted = useRef(true);
 
     const refresh = useCallback(async () => {
@@ -354,6 +356,14 @@ export const TabDictionary: VFC = () => {
                         description="Romaji under each reading and pitch accent, for learners who can't read kana yet"
                         checked={romaji}
                         onChange={(value) => { setRomaji(value); setShowRomaji(value); }}
+                    />
+                </PanelSectionRow>
+                <PanelSectionRow>
+                    <ToggleField
+                        label="Furigana on original text"
+                        description="Readings above kanji when the overlay shows the original text. Picked from the dictionary, so a word with several readings or a name can be read wrong"
+                        checked={furigana}
+                        onChange={(value) => { setFurigana(value); setShowFurigana(value); }}
                     />
                 </PanelSectionRow>
                 <PanelSectionRow>

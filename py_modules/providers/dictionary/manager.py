@@ -113,6 +113,8 @@ class DictionaryManager:
 
         self._jobs = queue.Queue()
         self._lock = threading.Lock()
+        self._annotate_cache = {}
+        self._annotate_key = None
         self._cancel = threading.Event()
         self._status = self._idle_status()
         self._last_error = None
@@ -124,6 +126,24 @@ class DictionaryManager:
 
     def lookup(self, text, offset=0):
         return self.engine.lookup(text, offset)
+
+    def annotate(self, text):
+        """Furigana segments for text. Cached, since the overlay asks for the same
+        captions again; the cache resets when the enabled dictionaries change."""
+        key = tuple(h.title for h in self.store.enabled_handles())
+        with self._lock:
+            if key != self._annotate_key:
+                self._annotate_cache.clear()
+                self._annotate_key = key
+            hit = self._annotate_cache.get(text)
+        if hit is not None:
+            return hit
+        segments = self.engine.annotate(text)
+        with self._lock:
+            self._annotate_cache[text] = segments
+            while len(self._annotate_cache) > 300:
+                self._annotate_cache.pop(next(iter(self._annotate_cache)))
+        return segments
 
     def has_term_dictionaries(self):
         return any(h.info.get("counts", {}).get("terms") for h in self.store.enabled_handles())
