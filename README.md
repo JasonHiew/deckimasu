@@ -11,6 +11,9 @@ Decky Translator is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-
 - **Bookmarks.** ☆ Save a word (or press A) to look it up later. The Bookmarks tab reopens it in the sentence it came from, and lets you add a note, mark it looked up and delete it.
 - **Send to phone with ntfy.** Send a whole text box, or just one word in its dictionary form. Tapping a word notification opens it in a phone dictionary such as Shirabe Jisho.
 - **Cached translations open in the dictionary.** Translation → View Cached Translations: tap an entry or press A to look up words in its original text.
+- **Furigana on the original text.** Show Original puts readings above the kanji, picked from the installed dictionaries (Dictionary → Learning Aids).
+- **Live subtitles (opt-in, heavy).** Translates the screen every few seconds while you play and draws the translations over the game, which keeps the controller. See [Memory and battery](#memory-and-battery).
+- **Incognito mode.** Nothing about what you read is written to the Deck: new translations stay in memory, caption text stays out of the logs, and saving a bookmark asks twice.
 - **Full controller navigation** of the overlay and the dictionary, with the D-pad or either stick.
 - **One-step dictionary install:** JMdict, JMnedict, Jiten frequency and a bundled Kanjium pitch accent dictionary. Any other Yomitan dictionary can be added from a .zip.
 - **Deploy from a PC** to the Deck over SSH, staying in Game Mode.
@@ -119,7 +122,8 @@ Controller navigation can be turned off under Controls → Controller Navigation
 |-------|--------|--------|
 | Overlay | D-pad or either stick | Pick a text box |
 | Overlay | A | Open the dictionary for the picked box |
-| Overlay | L1 / R1 | Switch the boxes between original and translated text |
+| Overlay | L1 | Hide or show all translations, to see the game underneath (also the Hide button) |
+| Overlay | R1 | Switch the boxes between original and translated text |
 | Overlay | B | Clear the selection |
 | Dictionary | ◀ ▶ (D-pad or stick) | Previous / next word |
 | Dictionary | L1 / R1 | Move the lookup one character |
@@ -132,6 +136,21 @@ Controller navigation can be turned off under Controls → Controller Navigation
 | Dictionary | Start | Change the popup size: ½, ⅓ or ⅔ of the screen's width, or Wide: full width and about half the height, at the top or bottom, so captions stay visible. Remembered for next time |
 
 The same controls work in the dictionary opened from the Bookmarks tab and from cached translations.
+
+## Memory and battery
+
+The Deck's 16 GB is shared with the game and can't be upgraded, so it is worth knowing what this plugin holds:
+
+| Part | Memory | When |
+|------|--------|------|
+| On-device OCR (Chrome Screen AI) | about **400 MB** | Loaded at the first translation, freed after 10 minutes without one |
+| On-device OCR with **Live subtitles** on | about **400 MB**, all the time | Stays loaded while the toggle is on, and keeps about one CPU core busy |
+| Dictionaries | a few MB | Database connections close after 3 minutes idle |
+| Web providers (Google Translate, OCR.space, Gemini) | none on the Deck | |
+
+**The Input Language setting (Translation tab) does two jobs:** it tells the OCR and translation what language to read, and it decides how much memory on-device OCR uses. With Japanese (or Chinese or Korean) as the input language, the OCR engine only loads the recognizers for those scripts; with auto-detect or any other language it loads all of them (about 550–600 MB). Games often contain graphics it would otherwise mistake for Arabic, Greek or Thai text, and each extra recognizer costs tens of MB: on the Deck this cut the worker from about 550–610 MB to about 400 MB with the same results. Other source languages load every recognizer, as before.
+
+To free the memory straight away, turn Live subtitles off; the OCR model unloads 10 minutes after the last translation.
 
 ## Sending to your phone (ntfy)
 

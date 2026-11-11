@@ -16,7 +16,7 @@ import type { NavButton } from "./Input";
 export type HorizontalTextAlignment = 'left' | 'right' | 'center' | 'justify';
 
 // UI Composition for overlay
-enum UIComposition {
+export enum UIComposition {
     Hidden = 0,
     Notification = 1,
     Overlay = 2,
@@ -44,7 +44,7 @@ const useUIComposition: (composition: UIComposition) => void = findModuleChild(
 // Mountable component that holds a composition state request.
 // When unmounted, the hook cleanup calls RemoveMinimumCompositionStateRequest,
 // fully releasing the request so Steam's own UI sections can get input focus.
-const CompositionRequest: VFC<{ level: UIComposition }> = ({ level }) => {
+export const CompositionRequest: VFC<{ level: UIComposition }> = ({ level }) => {
     useUIComposition(level);
     return null;
 };
@@ -362,7 +362,7 @@ function redistributeText(flat: string, maxLines: number): string {
 }
 
 // Area-based font sizing: picks a font size so the text fills the region
-function calculateFontSize(region: TranslatedRegion, scalingFactor: number, fontScale: number): number {
+export function calculateFontSize(region: TranslatedRegion, scalingFactor: number, fontScale: number): number {
     const regionWidth = (region.rect.right - region.rect.left) * scalingFactor;
     const regionHeight = (region.rect.bottom - region.rect.top) * scalingFactor;
     const text = region.translatedText || region.text;
@@ -708,9 +708,14 @@ export const TranslatedTextOverlay: VFC<{
             popupRef.current?.handleNav(button);
             return;
         }
+        // L1 hides every label to show the game underneath, and brings them back
+        if (button === 'l1' && regions.length > 0) {
+            setSelectedIndex(null);
+            navSource?.toggleTranslationsVisibility();
+            return;
+        }
         if (!translationsVisible || regions.length === 0) return;
         switch (button) {
-            case 'l1':
             case 'r1':
                 setShowOriginalText(v => !v);
                 break;
@@ -940,6 +945,8 @@ export const TranslatedTextOverlay: VFC<{
                                         outline: lookup?.index === index
                                             ? "2px solid #ffc107"
                                             : selectedIndex === index ? "2px solid #4fc3f7" : undefined,
+                                        // The picked or opened box goes above overlapping neighbours so it can be read
+                                        zIndex: lookup?.index === index || selectedIndex === index ? 1 : undefined,
 
                                         padding: '1px 2px',
                                         borderRadius: `${Math.round(6 * generalFactor)}px`,
@@ -1023,30 +1030,47 @@ export const TranslatedTextOverlay: VFC<{
                         </div>
                     )}
 
-                    {/* Original/translated toggle - click/tap to swap what the boxes display */}
+                    {/* Hide all labels (L1) and original/translated toggle (R1); tap works too */}
                     {!loading && regions.length > 0 && (
-                        <div
-                            onClick={() => setShowOriginalText(v => !v)}
-                            style={{
-                                position: "absolute",
-                                top: "20px",
-                                right: "20px",
-                                background: "rgba(0, 0, 0, 0.7)",
-                                padding: '6px 12px',
-                                borderRadius: '14px',
-                                zIndex: 7003,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                color: '#ffffff',
-                                fontSize: '13px',
-                                fontWeight: 'bold',
-                            }}>
-                            {showOriginalText ? "Show Translation" : "Show Original"}
-                            {navSource?.isControllerNavigationEnabled() && (
-                                <span style={{ marginLeft: '8px', opacity: 0.6, fontWeight: 'normal' }}>L1/R1</span>
-                            )}
+                        <div style={{
+                            position: "absolute",
+                            top: "20px",
+                            right: "20px",
+                            zIndex: 7003,
+                            display: 'flex',
+                            gap: '8px',
+                        }}>
+                            {[
+                                {
+                                    label: translationsVisible ? "Hide" : "Show",
+                                    hint: 'L1',
+                                    onClick: () => { setSelectedIndex(null); navSource?.toggleTranslationsVisibility(); },
+                                },
+                                ...(translationsVisible ? [{
+                                    label: showOriginalText ? "Show Translation" : "Show Original",
+                                    hint: 'R1',
+                                    onClick: () => setShowOriginalText(v => !v),
+                                }] : []),
+                            ].map(pill => (
+                                <div key={pill.hint}
+                                     onClick={(e) => { e.stopPropagation(); pill.onClick(); }}
+                                     style={{
+                                         background: "rgba(0, 0, 0, 0.7)",
+                                         padding: '6px 12px',
+                                         borderRadius: '14px',
+                                         display: 'flex',
+                                         alignItems: 'center',
+                                         cursor: 'pointer',
+                                         color: '#ffffff',
+                                         fontSize: '13px',
+                                         fontWeight: 'bold',
+                                     }}>
+                                    {pill.label}
+                                    {navSource?.isControllerNavigationEnabled() && (
+                                        <span style={{ marginLeft: '8px', opacity: 0.6, fontWeight: 'normal' }}>{pill.hint}</span>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
@@ -1067,7 +1091,7 @@ export const TranslatedTextOverlay: VFC<{
                     zIndex: 7003,
                     pointerEvents: 'none',
                 }}>
-                    A look up · D-pad/stick choose box · L1/R1 original/translation · B clear
+                    A look up · D-pad/stick choose box · L1 hide · R1 original/translation · B clear
                 </div>
             )}
 

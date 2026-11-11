@@ -7,6 +7,7 @@ import { TextTranslator } from "./TextTranslator";
 import { Input, InputMode, ActionType, ProgressInfo } from "./Input";
 import { ImageState } from "./Overlay";
 import { logger } from "./Logger";
+import { LiveState, LiveTracker } from "./LiveSubtitles";
 
 interface NtfyResult {
     success: boolean;
@@ -34,6 +35,15 @@ export class GameTranslatorLogic {
     private hideIdenticalTranslations: boolean = false;
     private currentRunId: number = 0;
     private sendingToPhone: boolean = false;
+
+    // Live subtitles: translate the screen every few seconds while the overlay is closed
+    public liveState = new LiveState();
+    private liveEnabled = false;
+    private liveTimer: ReturnType<typeof setTimeout> | null = null;
+    private liveBusy: Promise<void> | null = null;
+    private liveBackoffUntil = 0;
+    private liveTracker = new LiveTracker();
+    private static readonly LIVE_INTERVAL_MS = 3000;
 
     // Provider settings for upfront validation
     private ocrProvider: string = "rapidocr";
@@ -87,6 +97,8 @@ export class GameTranslatorLogic {
 
         imageState.onStateChanged((visible, _, __, ___, ____, _____, ______, _______, ________) => {
             this.shortcutInput.setOverlayVisible(visible);
+            // Live labels may be stale after the overlay; start fresh from the next frame
+            if (!visible && this.liveEnabled) this.resetLive();
 
             if (!this.enabled) return;
 
@@ -299,8 +311,73 @@ export class GameTranslatorLogic {
         }
     }
 
+    setLiveSubtitles = (on: boolean): void => {
+        if (on === this.liveEnabled) return;
+        this.liveEnabled = on;
+        logger.info('Translator', `Live subtitles ${on ? 'on' : 'off'}`);
+        if (this.liveTimer) clearTimeout(this.liveTimer);
+        this.liveTimer = null;
+        this.resetLive();
+        if (on) this.scheduleLive(500);
+    }
+
+    private resetLive(): void {
+        this.liveTracker.reset();
+        this.liveState.clear();
+    }
+
+    private scheduleLive(delay: number): void {
+        if (!this.liveEnabled) return;
+        this.liveTimer = setTimeout(() => {
+            const started = Date.now();
+            this.liveBusy = this.liveTick();
+            this.liveBusy.then(
+                () => this.scheduleLive(Math.max(250, GameTranslatorLogic.LIVE_INTERVAL_MS - (Date.now() - started))),
+                // Network or provider trouble: back off instead of hammering
+                () => this.scheduleLive(10000),
+            ).finally(() => { this.liveBusy = null; });
+        }, delay);
+    }
+
+    private async liveTick(): Promise<void> {
+        // Only while a game runs and nothing else uses the capture
+        if (!this.enabled || this.isProcessing || this.imageState.isVisible() || !Router.MainRunningApp) {
+            this.liveState.clear();
+            return;
+        }
+        // Translation service refused requests recently: keep the labels, wait
+        if (Date.now() < this.liveBackoffUntil) return;
+        const shot = await call<[string], { path: string; width?: number; height?: number }>(
+            'live_capture', Router.MainRunningApp?.display_name || '');
+        // A leftover file is purged before the next capture
+        if (!shot?.path || this.isProcessing || this.imageState.isVisible()) return;
+
+        let regions = await this.textRecognizer.recognizeTextFile(shot.path);
+        // Reading Japanese (or Chinese/Korean): boxes without those scripts are
+        // game UI in English or stray marks, not worth a translation request
+        if (/^(ja|zh|ko)/i.test(this.textTranslator.getInputLanguage())) {
+            regions = regions.filter(r => /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(r.text));
+        }
+        // Only boxes whose text is new get translated; matching labels stay put
+        const fresh = this.liveTracker.update(regions);
+        let translated = fresh.length ? await this.textTranslator.translateText(fresh) : [];
+        // Failed boxes are left out so a later pass retries them; when the
+        // service is refusing requests, pause the loop for a minute
+        if (translated.some(r => r.translationFailed)) {
+            translated = translated.filter(r => !r.translationFailed);
+            this.liveBackoffUntil = Date.now() + 60000;
+        }
+        if (this.hideIdenticalTranslations) {
+            translated = translated.filter(r => r.translatedText.trim().toLowerCase() !== r.text.trim().toLowerCase());
+        }
+        if (this.isProcessing || this.imageState.isVisible() || !this.liveEnabled) return;
+        this.liveTracker.apply(translated);
+        this.liveState.set(this.liveTracker.regions, shot.width, shot.height);
+    }
+
     // Clean up resources when plugin is unmounted
     cleanup(): void {
+        this.setLiveSubtitles(false);
         if (this.shortcutInput) {
             this.shortcutInput.unregister();
         }
@@ -374,6 +451,9 @@ export class GameTranslatorLogic {
 
         try {
             this.isProcessing = true;
+            // A live capture in flight holds the screenshot lock; let it finish
+            if (this.liveBusy) await this.liveBusy.catch(() => {});
+            this.liveState.clear();
 
             // Take screenshot FIRST while screen is clean (no overlay visible)
             const appName = Router.MainRunningApp?.display_name || "";
@@ -421,10 +501,12 @@ export class GameTranslatorLogic {
                 }
                 logger.info('Translator', `Translation complete: ${translatedRegions.length} regions`);
 
+                // Boxes the service failed on (rate limits) just show their
+                // Japanese, which is what the dictionary needs anyway
                 if (this.hideIdenticalTranslations) {
                     const before = translatedRegions.length;
                     translatedRegions = translatedRegions.filter(r =>
-                        r.translatedText.trim().toLowerCase() !== r.text.trim().toLowerCase()
+                        r.translationFailed || r.translatedText.trim().toLowerCase() !== r.text.trim().toLowerCase()
                     );
                     if (translatedRegions.length < before) {
                         logger.info('Translator', `Filtered ${before - translatedRegions.length} identical translations`);

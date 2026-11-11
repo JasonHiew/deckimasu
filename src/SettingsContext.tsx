@@ -41,6 +41,7 @@ export interface Settings {
     customRecognitionSettings: boolean;
     translationCacheEnabled: boolean;
     incognito: boolean; // New translations stay in RAM, no debug logs, bookmark Save asks first
+    liveSubtitles: boolean; // Translate the screen every few seconds while playing (heavy, opt-in)
     ntfyServerUrl: string; // ntfy server URL (e.g. https://ntfy.example.com)
     ntfyTopic: string; // ntfy topic name
     ntfyToken: string; // ntfy access token, if the topic requires auth
@@ -90,6 +91,7 @@ const initialSettings: Settings = {
     customRecognitionSettings: false,
     translationCacheEnabled: true,
     incognito: false,
+    liveSubtitles: false,
     ntfyServerUrl: "",
     ntfyTopic: "",
     ntfyToken: "",
@@ -174,6 +176,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                     customRecognitionSettings: serverSettings.custom_recognition_settings ?? false,
                     translationCacheEnabled: serverSettings.translation_cache_enabled ?? true,
                     incognito: serverSettings.incognito ?? false,
+                    liveSubtitles: serverSettings.live_subtitles ?? false,
                     ntfyServerUrl: serverSettings.ntfy_server_url || "",
                     ntfyTopic: serverSettings.ntfy_topic || "",
                     ntfyToken: serverSettings.ntfy_token || "",
@@ -212,6 +215,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                 logic.setAllowLabelGrowth(serverSettings.allow_label_growth ?? false);
                 logic.setOverlayControllerNavigation(serverSettings.overlay_controller_navigation ?? true);
                 setIncognito(serverSettings.incognito ?? false);
+                logic.setLiveSubtitles(serverSettings.live_subtitles ?? false);
 
                 logger.info('SettingsContext', 'All settings loaded successfully');
                 logger.logObject('SettingsContext', 'Settings', mappedSettings);
@@ -266,6 +270,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                 customRecognitionSettings: 'custom_recognition_settings',
                 translationCacheEnabled: 'translation_cache_enabled',
                 incognito: 'incognito',
+                liveSubtitles: 'live_subtitles',
                 ntfyServerUrl: 'ntfy_server_url',
                 ntfyTopic: 'ntfy_topic',
                 ntfyToken: 'ntfy_token',
@@ -337,6 +342,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
                     break;
                 case 'incognito':
                     setIncognito(value);
+                    break;
+                case 'liveSubtitles':
+                    logic.setLiveSubtitles(value);
                     break;
                 case 'ocrProvider':
                     logic.setOcrProvider(value);

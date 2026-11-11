@@ -1734,6 +1734,7 @@ class Plugin:
                 "custom_recognition_settings": self._settings.get_setting("custom_recognition_settings", False),
                 "translation_cache_enabled": self._translation_cache_enabled,
                 "incognito": self._incognito,
+                "live_subtitles": self._settings.get_setting("live_subtitles", False),
                 "ntfy_server_url": self._settings.get_setting("ntfy_server_url", ""),
                 "ntfy_topic": self._settings.get_setting("ntfy_topic", ""),
                 "ntfy_token": self._settings.get_setting("ntfy_token", ""),
@@ -2487,6 +2488,76 @@ class Plugin:
             self._translation_cache.put_many, pairs, source_lang, target_lang, tier, provider,
         )
 
+    # Live subtitles
+
+    @staticmethod
+    def _png_size(path):
+        """Width and height from a PNG header (Pillow is not importable here)."""
+        with open(path, "rb") as f:
+            head = f.read(24)
+        if head[:8] != b"\x89PNG\r\n\x1a\n":
+            return 0, 0
+        return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+
+    _gamescope_capture_ok: bool = None  # None until tried
+
+    async def _gamescope_screenshot(self, path):
+        """Game-only screenshot through gamescope. The PipeWire capture includes
+        Steam's layer once live labels are shown (Notification composition), so
+        OCR would read the labels and miss the text under them; gamescope's own
+        screenshot leaves that layer out. Returns True when the file is ready."""
+        if self._session_env is None:
+            self._session_env = self._load_session_env()
+        env = os.environ.copy()
+        for k, v in self._session_env.items():
+            env.setdefault(k, v)
+        env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "gamescopectl", "screenshot", path,
+                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL, env=env,
+            )
+            await asyncio.wait_for(proc.wait(), timeout=5)
+        except (OSError, asyncio.TimeoutError) as e:
+            logger.info(f"gamescope screenshot unavailable: {e}")
+            return False
+        # gamescope writes the file after the command returns; wait until it settles
+        last = -1
+        for _ in range(40):
+            await asyncio.sleep(0.05)
+            size = os.path.getsize(path) if os.path.exists(path) else -1
+            if size > 30_000 and size == last:
+                return True
+            last = size
+        return False
+
+    async def live_capture(self, app_name: str = ""):
+        """Screenshot for live subtitles: {path, width, height}, no base64 (the
+        frontend only needs the file for OCR, which deletes it)."""
+        path = ""
+        if self._gamescope_capture_ok is not False:
+            os.makedirs(self._screenshotPath, exist_ok=True)
+            self._purge_stale_screenshots()
+            candidate = f"{self._screenshotPath}/live_{datetime.now().strftime('%H-%M-%S_%f')}.png"
+            ok = await self._gamescope_screenshot(candidate)
+            if self._gamescope_capture_ok is None:
+                logger.info(f"Live capture via gamescope: {'yes' if ok else 'no, using PipeWire'}")
+                self._gamescope_capture_ok = ok
+            if ok:
+                path = candidate
+            elif os.path.exists(candidate):
+                os.remove(candidate)
+        if not path:
+            shot = await self.take_screenshot(app_name)
+            path = shot.get("path") if isinstance(shot, dict) else ""
+        if not path:
+            return {"path": "", "error": "capture_failed"}
+        try:
+            width, height = self._png_size(path)
+        except OSError:
+            width, height = 0, 0
+        return {"path": path, "width": width, "height": height}
+
     async def translate_text(self, text_regions, target_language=None, input_language=None):
         try:
             if not text_regions:
@@ -2554,9 +2625,13 @@ class Plugin:
             if cache_on and any(normalize(s) != normalize(t) for s, t in translated):
                 await self._cache_put(translated, input_lang, target_lang, self._translation_provider)
 
-            # A failed item shows its original text.
+            # A failed item shows its original text, flagged so the frontend does not
+            # mistake it for an identical translation and hide it.
+            failed = {s for s, t in zip(to_request, requested) if t is None}
             result_map = {s: (t if t is not None else s) for s, t in zip(to_request, requested)}
             result_map.update(cached)
+            if failed:
+                logger.warning(f"{len(failed)} of {len(to_request)} translations failed (shown untranslated)")
 
             translated_regions = []
             for region in text_regions:
@@ -2566,7 +2641,8 @@ class Plugin:
                     text = region["text"]
                     translated_regions.append({
                         **region,
-                        "translatedText": result_map.get(text, text)
+                        "translatedText": result_map.get(text, text),
+                        "translationFailed": text in failed and text not in cached,
                     })
 
             logger.debug(f"Returning {len(translated_regions)} translated regions (from {len(text_regions)} input regions)")

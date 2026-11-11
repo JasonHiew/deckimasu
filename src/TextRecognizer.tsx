@@ -503,6 +503,16 @@ export class TextRecognizer {
             .sort((a, b) => b.area - a.area);
 
         const removed = new Set<number>();
+        // A box that loses its space hands its text to the box that keeps it,
+        // in reading order, instead of dropping it: on text-heavy screens a
+        // grouped paragraph's box often covers a heading or bubble next to it
+        const absorb = (into: number, from: number) => {
+            const target = result[into];
+            const source = result[from];
+            const sourceAbove = (source.rect.top + source.rect.bottom) / 2 < (target.rect.top + target.rect.bottom) / 2;
+            target.text = sourceAbove ? `${source.text}\n${target.text}` : `${target.text}\n${source.text}`;
+            removed.add(from);
+        };
 
         for (let ai = 0; ai < byArea.length; ai++) {
             const idxA = byArea[ai].i;
@@ -527,7 +537,7 @@ export class TextRecognizer {
 
                 // If b is mostly inside a, absorb it
                 if (bArea > 0 && overlapArea / bArea > 0.5) {
-                    removed.add(idxB);
+                    absorb(idxA, idxB);
                     continue;
                 }
 
@@ -559,7 +569,7 @@ export class TextRecognizer {
                 }
 
                 if (candidates.length === 0) {
-                    removed.add(idxB);
+                    absorb(idxA, idxB);
                     continue;
                 }
 
@@ -574,7 +584,7 @@ export class TextRecognizer {
 
                 // If trimmed to nothing useful, remove it
                 if (b.right - b.left < 5 || b.bottom - b.top < 5) {
-                    removed.add(idxB);
+                    absorb(idxA, idxB);
                 }
             }
         }

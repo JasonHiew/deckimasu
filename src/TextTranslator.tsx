@@ -12,6 +12,7 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
 // Include translated text with the original region info
 export interface TranslatedRegion extends TextRegion {
     translatedText: string;
+    translationFailed?: boolean; // The service did not answer; translatedText is the original
 }
 
 export class TextTranslator {

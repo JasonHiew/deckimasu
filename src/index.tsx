@@ -23,6 +23,7 @@ import {
 
 import { BsTranslate } from "react-icons/bs";
 import { ImageState, ImageOverlay } from "./Overlay";
+import { LiveLabels } from "./LiveSubtitles";
 import { GameTranslatorLogic } from "./Translator";
 import { cleanupAllFontDOM } from "./fonts";
 import { ProgressInfo } from "./Input";
@@ -354,6 +355,11 @@ export default definePlugin(() => {
         <ImageOverlay state={imageState} onDismiss={logic.dismiss} onSendRegion={logic.sendRegionToPhone} onSendWord={logic.sendWordToPhone}/>
     ));
 
+    // Live subtitle labels over the running game (only drawn while there are some)
+    routerHook.addGlobalComponent("LiveSubtitles", () => (
+        <LiveLabels live={logic.liveState} imageState={imageState}/>
+    ));
+
     // Add activation indicator as a global component
     routerHook.addGlobalComponent("HoldActivationIndicator", () => (
         <ActivationIndicatorWithSettings logic={logic}/>
@@ -369,6 +375,7 @@ export default definePlugin(() => {
             cleanupAllFontDOM();
             routerHook.removeGlobalComponent("ImageOverlay");
             routerHook.removeGlobalComponent("HoldActivationIndicator");
+            routerHook.removeGlobalComponent("LiveSubtitles");
         },
         alwaysRender: true
     };
