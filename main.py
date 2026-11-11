@@ -279,6 +279,12 @@ class HidrawButtonMonitor:
     INPUTPLUMBER_PID = 0x12FB
     PACKET_SIZE = 64
     POLL_INTERVAL = 0.004  # 250Hz - matches controller report rate
+    # The controller reports ~250 times a second. Waking the thread for each
+    # report cost about 2% of a core on a Steam Deck, all the time. Instead the
+    # loop sleeps and then drains whatever arrived (the kernel queues up to 64
+    # reports), which is still far finer than the frontend's 100 ms polling.
+    BATCH_INTERVAL = 0.03
+    MAX_BATCH = 64
 
     # HID ioctl command
     HIDIOCSFEATURE = lambda self, size: (0xC0000000 | (size << 16) | (ord('H') << 8) | 0x06)
@@ -464,6 +470,8 @@ class HidrawButtonMonitor:
         try:
             # Open device with read/write access
             self.device_fd = os.open(self.device_path, os.O_RDWR)
+            # Reads are drained in batches by the monitor loop, so they must not block
+            os.set_blocking(self.device_fd, False)
             logger.info(f"Opened {self.device_path} for hidraw monitoring (pid={hex(self.device_pid or 0)})")
 
             # Only send init commands for real Steam Deck hardware
@@ -548,16 +556,22 @@ class HidrawButtonMonitor:
                         time.sleep(reconnect_delay)
                         continue
 
-                # Wait for data with select (timeout to allow checking running flag)
-                r, _, _ = select.select([self.device_fd], [], [], 0.1)
-                if not r:
+                # Sleep, then process every report that arrived meanwhile, in
+                # order, so short taps and press counts are not lost
+                time.sleep(self.BATCH_INTERVAL)
+                fd = self.device_fd
+                if fd is None:
                     continue
-
-                # Read packet
-                data = os.read(self.device_fd, self.PACKET_SIZE)
-                if len(data) >= 16:
-                    self._process_packet(data)
-                    self.error_count = 0
+                for _ in range(self.MAX_BATCH):
+                    try:
+                        data = os.read(fd, self.PACKET_SIZE)
+                    except BlockingIOError:
+                        break
+                    if not data:
+                        break
+                    if len(data) >= 16:
+                        self._process_packet(data)
+                        self.error_count = 0
 
             except OSError as e:
                 self.error_count += 1
