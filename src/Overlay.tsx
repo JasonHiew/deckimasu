@@ -740,11 +740,27 @@ export const TranslatedTextOverlay: VFC<{
         return () => navSource.offNav(listener);
     }, [navSource]);
 
+    // The overlay reads the controller itself, but Steam's UI gets the same
+    // presses. Over a running game, B there means "back" and drops the user on
+    // the game's library page (Resume). Swallow Steam's cancel while visible.
+    // Plugin code runs in the shared JS context, so this uses the window the
+    // overlay is drawn in (Steam's main UI), not the global one.
+    const rootRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const win = rootRef.current?.ownerDocument?.defaultView;
+        if (!visible || !win) return;
+        const swallow = (e: Event) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+        win.addEventListener('vgp_oncancel', swallow, true);
+        return () => win.removeEventListener('vgp_oncancel', swallow, true);
+    }, [visible]);
 
     return (
         <>
         {visible && <CompositionRequest level={UIComposition.Overlay} />}
-        <div id='translation-overlay'
+        <div id='translation-overlay' ref={rootRef}
              onClick={() => { if (lookup) setLookup(null); }}
              style={{
                  height: "100vh",
