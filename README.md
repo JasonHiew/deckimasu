@@ -2,7 +2,7 @@
 
 **A fork of [Decky Translator](https://github.com/cat-in-a-box/Decky-Translator) tuned for learning Japanese.**
 
-**デッキます (Deckimasu)** is デッキ (*dekki*, Deck) folded into できます (*dekimasu*, "I can do it"): with it, you can read the game. It started as decky-ocr-notify, which is still the repository's name.
+**デッキます (Deckimasu)** is デッキ (*dekki*, Deck) folded into できます (*dekimasu*, "I can do it"): with it, you can read the game. It started out as decky-ocr-notify; links to the old name still redirect here.
 
 *Why not Yomideck?* That was the other finalist, and a close one: 読み (*yomi*, "reading") plus Deck, and a nod to [Yomitan](https://github.com/yomidevs/yomitan), the browser dictionary this fork's popup is modelled on (lookups, deinflection, frequency and pitch dictionaries all follow how Yomitan does them). Deckimasu won for being a whole Japanese word you can say, and for saying what the plugin is for: being able to read.
 
@@ -62,10 +62,10 @@ Tap a text box on the overlay to look its words up, with pitch accent graphs, fr
 
 This fork is not in the Decky plugin store. Install it from its release zip:
 
-1. **Download [`decky-ocr-notify.zip`](https://github.com/JasonHiew/decky-ocr-notify/releases/latest/download/decky-ocr-notify.zip)** from the [latest release](https://github.com/JasonHiew/decky-ocr-notify/releases/latest). Don't unzip it.
-2. **Get it onto the Deck**, for example into Downloads: download it there with a browser in Desktop Mode, or copy it from a PC with `scp decky-ocr-notify.zip deck@<deck-ip>:~/Downloads/`.
+1. **Download [`deckimasu.zip`](https://github.com/JasonHiew/deckimasu/releases/latest/download/deckimasu.zip)** from the [latest release](https://github.com/JasonHiew/deckimasu/releases/latest). Don't unzip it.
+2. **Get it onto the Deck**, for example into Downloads: download it there with a browser in Desktop Mode, or copy it from a PC with `scp deckimasu.zip deck@<deck-ip>:~/Downloads/`.
 3. Press <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/qam.svg"><img height="16" alt="QAM" src="assets/icons/dark/qam.svg"></picture>, open the Decky tab <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/plug.svg"><img height="16" alt="Decky" src="assets/icons/dark/plug.svg"></picture> and open its settings <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icons/light/gear.svg"><img height="16" alt="Settings" src="assets/icons/dark/gear.svg"></picture>.
-4. In **General**, turn on **Developer Mode**. Then open **Developer** → **Install Plugin from ZIP file** → **Browse**, and pick `decky-ocr-notify.zip`.
+4. In **General**, turn on **Developer Mode**. Then open **Developer** → **Install Plugin from ZIP file** → **Browse**, and pick `deckimasu.zip`.
 
 On first install Decky downloads the plugin's Python dependencies (about 180 MB), the same ones Decky Translator uses.
 

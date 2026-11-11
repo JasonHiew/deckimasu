@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JasonHiew/decky-ocr-notify.git"
+    "url": "git+https://github.com/JasonHiew/deckimasu.git"
   },
   "keywords": [
     "decky",
@@ -24,9 +24,9 @@
   "author": "cat-in-a-box",
   "license": "GNU GPLv3",
   "bugs": {
-    "url": "https://github.com/JasonHiew/decky-ocr-notify/issues"
+    "url": "https://github.com/JasonHiew/deckimasu/issues"
   },
-  "homepage": "https://github.com/JasonHiew/decky-ocr-notify",
+  "homepage": "https://github.com/JasonHiew/deckimasu",
   "devDependencies": {
     "@decky/api": "^1.1.3",
     "@decky/rollup": "^1.0.1",

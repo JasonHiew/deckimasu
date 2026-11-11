@@ -105,15 +105,15 @@ jobs:
           # Decky names the plugin, settings and log folders after this inner folder
           mv "_staging/Deckimasu" "_staging/deckimasu"
           rm "Deckimasu.zip"
-          (cd _staging && zip -qr "../decky-ocr-notify.zip" deckimasu)
+          (cd _staging && zip -qr "../deckimasu.zip" deckimasu)
           rm -rf _staging
-          unzip -l "decky-ocr-notify.zip" | head -5
+          unzip -l "deckimasu.zip" | head -5
 
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v4
         with:
-          name: decky-ocr-notify
-          path: out/decky-ocr-notify.zip
+          name: deckimasu
+          path: out/deckimasu.zip
 
   release:
     if: needs.build.outputs.is_release == 'true'
@@ -125,7 +125,7 @@ jobs:
       - name: Download plugin artifact
         uses: actions/download-artifact@v4
         with:
-          name: decky-ocr-notify
+          name: deckimasu
           path: ./
 
       - name: Publish to GitHub Releases
@@ -133,6 +133,6 @@ jobs:
         with:
           tag_name: ${{ needs.build.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: decky-ocr-notify.zip
+          files: deckimasu.zip
           draft: true
           generate_release_notes: true
