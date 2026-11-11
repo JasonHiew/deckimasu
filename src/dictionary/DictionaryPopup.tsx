@@ -239,6 +239,9 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
     const [loading, setLoading] = useState(false);
     const [installStatus, setInstallStatus] = useState<DictionaryJobStatus | null>(null);
     const requestId = useRef(0);
+    // The history item the shown result was looked up for. Until a new lookup
+    // returns, the old result's match must not be drawn under the new cursor.
+    const resultFor = useRef<HistoryItem | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Controller state: highlighted entry (Y sends it) and the word-jump trail for ◀
@@ -260,6 +263,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                 ? await call<[string, number], LookupResult>('dictionary_lookup', text, item.offset)
                 : await call<[string, number], LookupResult>('dictionary_lookup', item.term, 0);
             if (id !== requestId.current) return;
+            resultFor.current = item;
             setResult(res);
             setSelectedEntry(0);
             if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -267,6 +271,7 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
         } catch (e) {
             logger.error('Dictionary', 'Lookup failed', e);
             if (id === requestId.current) {
+                resultFor.current = item;
                 setResult({ success: false, error: 'lookup_error', message: String(e), matchStart: 0, matchEnd: 0, entries: [] });
             }
         } finally {
@@ -343,8 +348,11 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
         }
     };
 
-    const highlightStart = current.kind === 'scan' && result ? result.matchStart : -1;
-    const highlightEnd = current.kind === 'scan' && result ? result.matchEnd : -1;
+    // Only highlight a match that belongs to the cursor's current position; while
+    // the next lookup is pending, just the cursor underline shows
+    const resultIsCurrent = current.kind === 'scan' && result !== null && resultFor.current === current;
+    const highlightStart = resultIsCurrent ? result!.matchStart : -1;
+    const highlightEnd = resultIsCurrent ? result!.matchEnd : -1;
     const cursor = current.kind === 'scan' ? current.offset : -1;
 
     const entries = result?.entries || [];
@@ -468,13 +476,18 @@ export const DictionaryPopup = forwardRef<DictionaryPopupHandle, DictionaryPopup
                 {Array.from(text).map((ch, i) => {
                     if (ch === '\n') return <br key={i} />;
                     const highlighted = i >= highlightStart && i < highlightEnd;
+                    // One rounded block per word: round only its outer corners
+                    const first = i === highlightStart;
+                    const last = i === highlightEnd - 1;
                     return (
                         <span
                             key={i}
                             onClick={() => { wordTrail.current = []; scanAt(i); }}
                             style={{
                                 cursor: 'pointer',
-                                borderRadius: '3px',
+                                borderRadius: highlighted
+                                    ? `${first ? 4 : 0}px ${last ? 4 : 0}px ${last ? 4 : 0}px ${first ? 4 : 0}px`
+                                    : '3px',
                                 background: highlighted ? 'rgba(255, 193, 7, 0.45)' : undefined,
                                 boxShadow: i === cursor && !highlighted ? 'inset 0 -2px 0 #ffc107' : undefined,
                             }}
