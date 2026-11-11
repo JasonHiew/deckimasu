@@ -60,16 +60,108 @@ _SizeCb = ctypes.CFUNCTYPE(ctypes.c_uint32, ctypes.c_char_p)
 _ContentCb = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_uint32, ctypes.c_void_p)
 
 
+# Which line recognizer each script uses. The engine loads a recognizer the
+# first time it thinks it sees that script, and game graphics often look like
+# Arabic, Korean, Greek, Hebrew or Thai to it; each one costs tens of MB.
+# Serving a config that lists only the scripts the user reads keeps them out
+# (measured on the Deck: 547 -> 396 MB over 13 game screenshots, same text).
+_LINE_RECOGNIZER_CONFIG = "gocr_line_recognition_omni_mobile_chrome_multiscript_2024_q4.binarypb"
+
+
+def _read_varint(buf, i):
+    shift = result = 0
+    while True:
+        b = buf[i]
+        i += 1
+        result |= (b & 0x7F) << shift
+        if b < 0x80:
+            return result, i
+        shift += 7
+
+
+def _write_varint(n):
+    out = bytearray()
+    while True:
+        b = n & 0x7F
+        n >>= 7
+        if n:
+            out.append(b | 0x80)
+        else:
+            out.append(b)
+            return bytes(out)
+
+
+def _proto_fields(buf):
+    """Yields (field number, wire type, value bytes, raw bytes) of a protobuf message."""
+    i = 0
+    while i < len(buf):
+        start = i
+        key, i = _read_varint(buf, i)
+        num, wire = key >> 3, key & 7
+        if wire == 0:
+            _, i = _read_varint(buf, i)
+            val = buf[start:i]
+        elif wire == 2:
+            length, i = _read_varint(buf, i)
+            val = buf[i:i + length]
+            i += length
+        elif wire == 5:
+            val = buf[i:i + 4]
+            i += 4
+        elif wire == 1:
+            val = buf[i:i + 8]
+            i += 8
+        else:
+            raise ValueError(f"unsupported wire type {wire}")
+        yield num, wire, val, buf[start:i]
+
+
+def trim_recognizer_config(data, keep):
+    """Drops the script -> recognizer entries not in keep from the config
+    (an Any wrapping MultiPassLineRecognitionMutatorConfig, whose field 2
+    holds the map entries as field 1 with the script name as key)."""
+    out = bytearray()
+    for num, wire, val, raw in _proto_fields(data):
+        if num == 2 and wire == 2:
+            inner = bytearray()
+            for n2, w2, v2, r2 in _proto_fields(val):
+                if n2 == 1 and w2 == 2:
+                    key = next((v.decode() for n, w, v, _ in _proto_fields(v2) if n == 1 and w == 2), None)
+                    if key not in keep:
+                        continue
+                inner += r2
+            out += _write_varint((2 << 3) | 2) + _write_varint(len(inner)) + bytes(inner)
+        else:
+            out += raw
+    return bytes(out)
+
+
 class ScreenAIEngine:
     """Wraps libchromescreenai.so and PerformOCR."""
 
-    def __init__(self, model_dir):
+    def __init__(self, model_dir, scripts=None):
         self.model_dir = model_dir
+        # Replacement for the line recognizer config when only some scripts are wanted
+        self._config_override = None
+        if scripts:
+            for root, _, files in os.walk(model_dir):
+                if _LINE_RECOGNIZER_CONFIG in files:
+                    with open(os.path.join(root, _LINE_RECOGNIZER_CONFIG), 'rb') as f:
+                        self._config_override = trim_recognizer_config(f.read(), set(scripts))
+                    break
+
+        def override_for(p):
+            if self._config_override is not None and os.path.basename(p) == _LINE_RECOGNIZER_CONFIG:
+                return self._config_override
+            return None
 
         # Anchor CFUNCTYPE refs on self; GC would dangle the C callbacks.
         @_SizeCb
         def get_size(p):
             try:
+                override = override_for(p.decode('utf-8'))
+                if override is not None:
+                    return len(override)
                 full = os.path.join(self.model_dir, p.decode('utf-8'))
                 return os.path.getsize(full) if os.path.exists(full) else 0
             except Exception:
@@ -78,6 +170,10 @@ class ScreenAIEngine:
         @_ContentCb
         def get_content(p, n, out_ptr):
             try:
+                override = override_for(p.decode('utf-8'))
+                if override is not None:
+                    ctypes.memmove(out_ptr, override[:n], min(n, len(override)))
+                    return
                 full = os.path.join(self.model_dir, p.decode('utf-8'))
                 if not os.path.exists(full):
                     return
@@ -202,11 +298,11 @@ def _proto_to_regions(proto_bytes, scale_x, scale_y, min_confidence):
     return regions
 
 
-def run_oneshot(image_path, model_dir, min_confidence):
+def run_oneshot(image_path, model_dir, min_confidence, scripts=None):
     debug = []
     try:
         debug.append(f"Python: {sys.version}")
-        engine = ScreenAIEngine(model_dir)
+        engine = ScreenAIEngine(model_dir, scripts)
         debug.append(f"max_dim: {engine.max_dim}")
 
         rgba, w, h, sx, sy = _load_image_rgba(image_path, engine.max_dim)
@@ -233,7 +329,7 @@ def _write_line(obj):
 def worker_main():
     """Long-lived worker. Mirrors rapidocr_subprocess.worker_main protocol.
 
-      >>> {"type":"init","model_dir":"...","min_confidence":0.5}
+      >>> {"type":"init","model_dir":"...","min_confidence":0.5,"scripts":["Jpan","Hani","und"] or null}
       <<< {"type":"ready","error":null}
 
       >>> {"type":"recognize","image_path":"/tmp/x.png"}
@@ -242,7 +338,7 @@ def worker_main():
       >>> {"type":"shutdown"}
     """
     engine = None
-    cfg = {"model_dir": "", "min_confidence": 0.5}
+    cfg = {"model_dir": "", "min_confidence": 0.5, "scripts": None}
 
     try:
         while True:
@@ -265,7 +361,7 @@ def worker_main():
                     for k in cfg.keys():
                         if k in msg:
                             cfg[k] = msg[k]
-                    engine = ScreenAIEngine(cfg["model_dir"])
+                    engine = ScreenAIEngine(cfg["model_dir"], cfg["scripts"])
                     _write_line({"type": "ready", "error": None})
                 except Exception as e:
                     import traceback
@@ -325,7 +421,8 @@ def main():
     image_path = sys.argv[1]
     model_dir = sys.argv[2]
     min_confidence = float(sys.argv[3])
-    print(json.dumps(run_oneshot(image_path, model_dir, min_confidence)))
+    scripts = sys.argv[4].split(",") if len(sys.argv) > 4 and sys.argv[4] else None
+    print(json.dumps(run_oneshot(image_path, model_dir, min_confidence, scripts)))
 
 
 if __name__ == '__main__':

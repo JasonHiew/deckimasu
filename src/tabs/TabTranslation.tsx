@@ -723,11 +723,14 @@ export const TabTranslation: VFC<TabTranslationProps> = ({ scrollTarget, onScrol
                     <DropdownItem
                         layout="below"
                         label="Input Language"
-                        description={isCT2
+                        description={(isCT2
                             ? "Source language (auto-detect not available for offline translation)"
                             : settings.ocrProvider === 'rapidocr'
                                 ? "Source language for text recognition"
-                                : "Source language (Select auto-detect if unsure)"}
+                                : "Source language (Select auto-detect if unsure)")
+                            + (settings.ocrProvider === 'chromescreenai'
+                                ? ". Also sets on-device OCR memory: Japanese, Chinese or Korean load only those scripts (about 400 MB); auto-detect and other languages load every script (about 550–600 MB)"
+                                : "")}
                         rgOptions={inputLanguageOptions}
                         selectedOption={settings.inputLanguage}
                         onChange={(option: any) => updateSetting('inputLanguage', option.data, 'Input language')}

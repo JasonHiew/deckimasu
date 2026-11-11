@@ -58,6 +58,9 @@ class ChromeScreenAIProvider(OCRProvider):
         # model_dir holds the .so and TFLite files; owned by ScreenAIDownloader.
         self._model_dir = model_dir
         self._min_confidence = max(0.0, min(1.0, min_confidence))
+        # Scripts the engine may load recognizers for (None = all), set per source language
+        self._scripts = None
+        self._worker_scripts = None
         self._init_error: Optional[str] = None
         self._python_path: Optional[str] = None
 
@@ -193,6 +196,19 @@ class ChromeScreenAIProvider(OCRProvider):
 
         threading.Thread(target=drain, daemon=True).start()
 
+    @staticmethod
+    def scripts_for_language(language: str):
+        """Scripts the engine may recognize for a source language; None means all.
+        Fewer scripts keep unneeded recognizers (tens of MB each) unloaded."""
+        lang = (language or "").lower()
+        if lang == "ja" or lang.startswith("ja-"):
+            return ["Jpan", "Hani", "und"]
+        if lang.startswith("zh"):
+            return ["Hani", "und"]
+        if lang == "ko" or lang.startswith("ko-"):
+            return ["Kore", "Hani", "und"]
+        return None
+
     def _build_worker_env(self) -> dict:
         env = os.environ.copy()
         env['PYTHONPATH'] = self._py_modules_dir
@@ -233,6 +249,7 @@ class ChromeScreenAIProvider(OCRProvider):
                 "type": "init",
                 "model_dir": self._model_dir,
                 "min_confidence": self._min_confidence,
+                "scripts": self._scripts,
             }
             start = time.time()
             try:
@@ -254,7 +271,8 @@ class ChromeScreenAIProvider(OCRProvider):
                 return False
 
             elapsed = time.time() - start
-            logger.info(f"Chrome Screen AI worker ready ({elapsed:.2f}s)")
+            self._worker_scripts = self._scripts
+            logger.info(f"Chrome Screen AI worker ready ({elapsed:.2f}s, scripts: {', '.join(self._scripts) if self._scripts else 'all'})")
             self._idle.touch()
             return True
 
@@ -304,6 +322,13 @@ class ChromeScreenAIProvider(OCRProvider):
         if not self._check_availability():
             logger.error(f"Chrome Screen AI not available: {self._init_error}")
             return []
+
+        scripts = self.scripts_for_language(language)
+        if scripts != self._scripts:
+            self._scripts = scripts
+            # The worker was set up for another language; the next call starts a fresh one
+            if self._is_worker_alive() and self._worker_scripts != scripts:
+                self.stop_worker()
 
         if self._persistent_mode:
             result = self._recognize_via_worker(image_data)
@@ -400,6 +425,7 @@ class ChromeScreenAIProvider(OCRProvider):
             cmd = [
                 self._python_path, '-S', self._subprocess_script,
                 temp_path, self._model_dir, str(self._min_confidence),
+                ",".join(self._scripts or []),
             ]
             result = subprocess.run(
                 cmd, capture_output=True, text=True,
