@@ -366,7 +366,7 @@ export default definePlugin(() => {
     ));
 
     return {
-        title: <div className={staticClasses.Title}>Decky Translator</div>,
+        title: <div className={staticClasses.Title}>Deckimasu</div>,
         content: <TranslatorApp logic={logic}/>,
         icon: <BsTranslate/>,
         onDismount() {

@@ -1,11 +1,11 @@
 {
-  "name": "Decky Translator",
-  "author": "cat-in-a-box",
+  "name": "Deckimasu",
+  "author": "JasonHiew (based on Decky Translator by cat-in-a-box)",
   "api_version": 1,
   "flags": [],
   "publish": {
     "tags": ["Translation"],
-    "description": "Translate anything on your screen to your language",
+    "description": "Read Japanese games with OCR, translation and a Yomitan-style dictionary",
     "image": "https://raw.githubusercontent.com/cat-in-a-box/Decky-Translator/main/assets/store-image.png"
   }
 }

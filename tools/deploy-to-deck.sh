@@ -57,7 +57,7 @@ fi
 
 mkdir -p tmp
 ARCHIVE="tmp/deck-update.tgz"
-REMOTE_ARCHIVE="/tmp/decky-translator-update.tgz"
+REMOTE_ARCHIVE="/tmp/deckimasu-update.tgz"
 # main.py goes last so the reload it triggers already sees the new modules
 tar -czf "$ARCHIVE" --exclude='__pycache__' --exclude='*.pyc' --exclude='*.map' \
     py_modules/providers dist package.json main.py
@@ -68,10 +68,10 @@ if [ "$DRY_RUN" = 1 ]; then
     exit 0
 fi
 
-echo "Looking for Decky Translator on $TARGET..."
-PLUGIN_DIR="$(ssh "${SSH_OPTS[@]}" "$TARGET" 'for f in ~/homebrew/plugins/*/plugin.json; do grep -q "\"Decky Translator\"" "$f" && dirname "$f"; done' | head -n 1)"
+echo "Looking for Deckimasu on $TARGET..."
+PLUGIN_DIR="$(ssh "${SSH_OPTS[@]}" "$TARGET" 'for f in ~/homebrew/plugins/*/plugin.json; do grep -q "\"Deckimasu\"" "$f" && dirname "$f"; done' | head -n 1)"
 if [ -z "$PLUGIN_DIR" ]; then
-    echo "Decky Translator is not installed on $HOST. Install it once (Decky store or a release zip), then rerun this." >&2
+    echo "Deckimasu is not installed on $HOST. Install it once from a release zip, then rerun this." >&2
     exit 1
 fi
 echo "Updating $PLUGIN_DIR"

@@ -1,6 +1,10 @@
-# decky-ocr-notify
+# Deckimasu
 
 **A fork of [Decky Translator](https://github.com/cat-in-a-box/Decky-Translator) tuned for learning Japanese.**
+
+**デッキます (Deckimasu)** is デッキ (*dekki*, Deck) folded into できます (*dekimasu*, "I can do it"): with it, you can read the game. It started as decky-ocr-notify, which is still the repository's name.
+
+*Why not Yomideck?* That was the other finalist, and a close one: 読み (*yomi*, "reading") plus Deck, and a nod to [Yomitan](https://github.com/yomidevs/yomitan), the browser dictionary this fork's popup is modelled on (lookups, deinflection, frequency and pitch dictionaries all follow how Yomitan does them). Deckimasu won for being a whole Japanese word you can say, and for saying what the plugin is for: being able to read.
 
 Decky Translator is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin by cat-in-a-box that captures your Steam Deck screen, recognizes the text with OCR, translates it and shows the result in an overlay. All of that comes from the original project. This fork adds a Yomitan-style dictionary on top, so you can read Japanese games and look up words without leaving them, plus ways to send words to your phone or save them for later.
 
@@ -64,8 +68,8 @@ This fork is not in the Decky plugin store. Install it from its release zip:
 
 On first install Decky downloads the plugin's Python dependencies (about 180 MB), the same ones Decky Translator uses.
 
-- **It replaces Decky Translator.** The plugin still installs as "Decky Translator", so it takes the place of the original if you had it. Your settings carry over.
-- **Don't update it from the Decky store.** The store sees the plugin as Decky Translator and may offer the original's version as an update, which would replace this fork. To update the fork, install the newer release zip the same way.
+- **To update**, install the newer release zip the same way. Deckimasu is not in the Decky store, and has its own name, so the store never replaces it.
+- **Coming from Decky Translator, or from this fork before 1.0** (when it still installed as "Decky Translator"): install Deckimasu, open it once, then **uninstall Decky Translator** in Decky's settings. On its first start Deckimasu moves your settings, dictionaries, downloaded models, bookmarks and cached translations over from Decky Translator's folder (a move, not a copy, so no extra space). Until you uninstall Decky Translator both plugins react to the same buttons.
 - To try changes from source, [deploy from a PC](#updating-the-deck-from-a-pc) instead.
 
 ## Using it
@@ -266,7 +270,7 @@ For security, you can restrict the API key to only the Vision and Translation AP
 ![API-Key-Restriction](assets/google-cloud-key-4.jpg)
 
 ### Step 5: Add API Key to Plugin
-1. Open the Decky Translator plugin on your Steam Deck
+1. Open the Deckimasu plugin on your Steam Deck
 2. Go to the Translation tab
 3. Select Google Cloud Vision and/or Google Cloud Translation as your providers
 4. Click "Set Key"

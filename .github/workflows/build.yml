@@ -101,11 +101,11 @@ jobs:
         run: |
           cd out
           mkdir _staging
-          unzip -q "Decky Translator.zip" -d _staging
-          # Same folder name as upstream, so it installs over / updates the same plugin
-          mv "_staging/Decky Translator" "_staging/decky-translator"
-          rm "Decky Translator.zip"
-          (cd _staging && zip -qr "../decky-ocr-notify.zip" decky-translator)
+          unzip -q "Deckimasu.zip" -d _staging
+          # Decky names the plugin, settings and log folders after this inner folder
+          mv "_staging/Deckimasu" "_staging/deckimasu"
+          rm "Deckimasu.zip"
+          (cd _staging && zip -qr "../decky-ocr-notify.zip" deckimasu)
           rm -rf _staging
           unzip -l "decky-ocr-notify.zip" | head -5
 

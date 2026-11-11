@@ -78,7 +78,7 @@ ATTRIBUTION = (
 )
 
 _HTTP_TIMEOUT = 30
-_USER_AGENT = "decky-translator-dictionary/1.0"
+_USER_AGENT = "deckimasu-dictionary/1.0"
 
 
 _DOWNLOAD_ATTEMPTS = 3

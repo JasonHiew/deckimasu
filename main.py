@@ -55,15 +55,15 @@ def _should_extract_dependencies():
 
 if _should_extract_dependencies():
     try:
-        print(f"[Decky Translator] Extracting dependencies from {DEPENDENCIES_ARCHIVE}...")
+        print(f"[Deckimasu] Extracting dependencies from {DEPENDENCIES_ARCHIVE}...")
         with tarfile.open(DEPENDENCIES_ARCHIVE, "r:gz") as tar:
             tar.extractall(path=BIN_DIR)
         # Create marker file to indicate successful extraction
         with open(EXTRACTION_MARKER, "w") as f:
             f.write(f"Extracted at {datetime.now().isoformat()}\n")
-        print(f"[Decky Translator] Dependencies extracted successfully")
+        print(f"[Deckimasu] Dependencies extracted successfully")
     except Exception as e:
-        print(f"[Decky Translator] Failed to extract dependencies: {e}")
+        print(f"[Deckimasu] Failed to extract dependencies: {e}")
         # Remove marker if it exists, so we retry next time
         if os.path.exists(EXTRACTION_MARKER):
             os.remove(EXTRACTION_MARKER)
@@ -202,15 +202,15 @@ logger.debug(f"GStreamer plugins path: {GSTPLUGINSPATH}")
 os.makedirs(DECKY_PLUGIN_LOG_DIR, exist_ok=True)
 
 # Set up log files
-std_out_file_path = Path(DECKY_PLUGIN_LOG_DIR) / "decky-translator-std-out.log"
+std_out_file_path = Path(DECKY_PLUGIN_LOG_DIR) / "deckimasu-std-out.log"
 std_out_file = open(std_out_file_path, "w")
-std_err_file = open(Path(DECKY_PLUGIN_LOG_DIR) / "decky-translator-std-err.log", "w")
+std_err_file = open(Path(DECKY_PLUGIN_LOG_DIR) / "deckimasu-std-err.log", "w")
 logger.debug(f"Standard output logs: {std_out_file_path}")
 
 # Set up file logging
 from logging.handlers import TimedRotatingFileHandler
 
-log_file = Path(DECKY_PLUGIN_LOG_DIR) / "decky-translator.log"
+log_file = Path(DECKY_PLUGIN_LOG_DIR) / "deckimasu.log"
 log_file_handler = TimedRotatingFileHandler(log_file, when="midnight", backupCount=2)
 log_file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 log_file_handler.addFilter(_url_redact_filter)
@@ -229,7 +229,49 @@ try:
         _plugin_version = json.load(_pkg).get("version", "unknown")
 except Exception as _e:
     _plugin_version = "unknown"
-logger.info(f"Decky Translator v{_plugin_version} starting")
+logger.info(f"Deckimasu v{_plugin_version} starting")
+
+
+def _migrate_from_decky_translator(settings_dir):
+    """This fork used to install as "Decky Translator", so its settings,
+    dictionaries, OCR/translation models, bookmarks and cache live in
+    settings/decky-translator. On the first start under the new name, move
+    them over (a rename on the same disk: instant, no extra space). Only when
+    the new folder has no settings of its own yet."""
+    old_dir = os.path.join(os.path.dirname(os.path.normpath(settings_dir)), "decky-translator")
+    marker = os.path.join(old_dir, "MOVED-TO-DECKIMASU.txt")
+    if (os.path.basename(os.path.normpath(settings_dir)) == "decky-translator"
+            or not os.path.isfile(os.path.join(old_dir, "decky-translator-settings.json"))
+            or os.path.exists(os.path.join(settings_dir, "decky-translator-settings.json"))
+            or os.path.exists(marker)):
+        return
+    os.makedirs(settings_dir, exist_ok=True)
+    moved, skipped = [], []
+    for name in sorted(os.listdir(old_dir)):
+        src, dst = os.path.join(old_dir, name), os.path.join(settings_dir, name)
+        if os.path.exists(dst):
+            skipped.append(name)
+            continue
+        try:
+            os.rename(src, dst)
+            moved.append(name)
+        except OSError as e:
+            logger.error(f"Could not move {name} from Decky Translator's folder: {e}")
+            skipped.append(name)
+    try:
+        with open(marker, "w") as f:
+            f.write("Settings, dictionaries and models were moved to the Deckimasu plugin's "
+                    f"folder ({settings_dir}). Uninstall Decky Translator; this folder can be deleted.\n")
+    except OSError:
+        pass
+    logger.info(f"Moved Decky Translator data to {settings_dir}: {', '.join(moved) or 'nothing'}"
+                + (f"; left in place: {', '.join(skipped)}" if skipped else ""))
+
+
+try:
+    _migrate_from_decky_translator(settingsDir)
+except Exception as _e:
+    logger.error(f"Moving data from Decky Translator failed: {_e}")
 
 
 import threading

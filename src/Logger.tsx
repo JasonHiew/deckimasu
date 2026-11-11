@@ -1,5 +1,5 @@
 /**
- * Styled logger for DeckyTranslator
+ * Styled logger for Deckimasu
  * Provides colored console logging with consistent formatting
  * Logging can be enabled/disabled via debug mode
  */
@@ -14,7 +14,7 @@ export enum LogLevel {
 }
 
 class Logger {
-    private readonly appName = 'DeckyTranslator';
+    private readonly appName = 'Deckimasu';
     private _enabled = false; // Debug mode off by default
 
     // Color styles for console
