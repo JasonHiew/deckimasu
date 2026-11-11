@@ -943,7 +943,7 @@ export const TabTranslation: VFC<TabTranslationProps> = ({ scrollTarget, onScrol
                     <PanelSectionRow>
                         <ToggleField
                             label="Faster Recognition"
-                            description="Keeps the recognition engine loaded in memory between translations"
+                            description="Keeps the recognition engine loaded in memory between translations. It unloads after 10 minutes without a translation, to free RAM for games"
                             checked={settings.rapidocrPersistentMode}
                             onChange={(value) => {
                                 updateSetting('rapidocrPersistentMode', value, 'Faster recognition');
@@ -956,7 +956,7 @@ export const TabTranslation: VFC<TabTranslationProps> = ({ scrollTarget, onScrol
                     <PanelSectionRow>
                         <ToggleField
                             label="Faster Recognition"
-                            description="Keeps the recognition engine loaded in memory between translations"
+                            description="Keeps the recognition engine loaded in memory between translations. It unloads after 10 minutes without a translation, to free RAM for games"
                             checked={settings.chromeScreenAiPersistentMode}
                             onChange={(value) => {
                                 updateSetting('chromeScreenAiPersistentMode', value, 'Faster recognition');
@@ -1192,7 +1192,7 @@ export const TabTranslation: VFC<TabTranslationProps> = ({ scrollTarget, onScrol
                     <PanelSectionRow>
                         <ToggleField
                             label="Faster Translation"
-                            description="Keeps the translation model loaded in memory between translations"
+                            description="Keeps the translation model loaded in memory until the plugin stops. When off, it still stays loaded for 10 minutes after a translation"
                             checked={settings.ct2PersistentMode}
                             onChange={(value) => {
                                 updateSetting('ct2PersistentMode', value, 'Faster translation');

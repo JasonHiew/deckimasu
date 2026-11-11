@@ -14,6 +14,12 @@ from typing import List, Optional
 
 from .base import OCRProvider, ProviderType, TextRegion
 from . import python_runtime
+from .idle import IdleTimer
+
+# A worker kept loaded for speed is still stopped after this long without a
+# request, and started again by the next one, so it does not hold RAM while a
+# game is being played without translating.
+WORKER_IDLE_TIMEOUT = 600  # seconds
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +131,7 @@ class RapidOCRProvider(OCRProvider):
         self._persistent_mode = False
         self._worker_proc: Optional[subprocess.Popen] = None
         self._worker_lock = threading.Lock()
+        self._idle = IdleTimer(WORKER_IDLE_TIMEOUT, self.stop_worker, "RapidOCR worker")
 
         # Path to subprocess script
         # Check bin/py_modules first (Decky Store install via remote_binary)
@@ -431,6 +438,7 @@ class RapidOCRProvider(OCRProvider):
 
             elapsed = time.time() - start
             logger.info(f"RapidOCR worker ready ({elapsed:.2f}s)")
+            self._idle.touch()
             return True
 
     def stop_worker(self) -> None:
@@ -501,6 +509,7 @@ class RapidOCRProvider(OCRProvider):
         if not self._is_worker_alive():
             if not self.start_worker():
                 return None
+        self._idle.touch()
 
         temp_path = os.path.join(
             tempfile.gettempdir(),

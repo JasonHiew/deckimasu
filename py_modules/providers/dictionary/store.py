@@ -12,12 +12,19 @@ import sqlite3
 import threading
 import zlib
 
+from ..idle import IdleTimer
+
 logger = logging.getLogger(__name__)
 
 REGISTRY_NAME = "dictionaries.json"
 
 # Max bound parameters per query; SQLite's historical default limit is 999
 _QUERY_CHUNK = 900
+
+# Open dictionary databases keep SQLite page caches (about 14 MB for the
+# recommended set after some lookups). They are closed after this long without
+# a lookup and reopened by the next one, which costs about 25 ms once.
+CONNECTION_IDLE_TIMEOUT = 180  # seconds
 
 
 def decode_json_blob(blob, zdict):
@@ -141,6 +148,7 @@ class DictionaryStore:
         self._lock = threading.RLock()
         self._entries = []
         self._handles = {}
+        self._idle = IdleTimer(CONNECTION_IDLE_TIMEOUT, self.close_connections, "dictionary connections")
         self._cleanup_partial_imports()
         self._load()
 
@@ -287,9 +295,19 @@ class DictionaryStore:
                     handle = InstalledDictionary(dict(e), self.db_path(e["id"]))
                     self._handles[e["id"]] = handle
                 handles.append(handle)
-            return handles
+        if handles:
+            self._idle.touch()
+        return handles
+
+    def close_connections(self):
+        """Closes open databases but keeps the handles; each reopens on its next query."""
+        with self._lock:
+            handles = list(self._handles.values())
+        for h in handles:
+            h.close()
 
     def close(self):
+        self._idle.cancel()
         with self._lock:
             handles = list(self._handles.values())
             self._handles.clear()
