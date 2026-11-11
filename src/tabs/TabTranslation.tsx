@@ -133,6 +133,7 @@ const ApiKeyModal: VFC<{
 
 const cacheProviderLabel = (p: string) => ({
     ct2: "On-Device",
+    quickmt: "On-Device ja→en",
     freegoogle: "Google Translate",
     googlecloud: "Google Cloud",
     gemini_vision: "Gemini Vision",
@@ -532,6 +533,17 @@ function useNllbModelStatus() {
     });
 }
 
+function useQuickMTStatus() {
+    return useModelDownload({
+        getStatusCall: 'get_quickmt_status',
+        downloadCall: 'download_quickmt_model',
+        cancelCall: 'cancel_quickmt_download',
+        deleteCall: 'delete_quickmt_model',
+        clearErrorCall: 'clear_quickmt_model_error',
+        defaultApproxMb: 400,
+    });
+}
+
 function useRapidOCRStatus() {
     return useModelDownload({
         getStatusCall: 'get_rapidocr_models_status',
@@ -655,6 +667,7 @@ export const TabTranslation: VFC<TabTranslationProps> = ({ scrollTarget, onScrol
     const ct2ActionRef = useRef<HTMLDivElement>(null);
     const csai = useChromeScreenAIStatus();
     const nllb = useNllbModelStatus();
+    const qmt = useQuickMTStatus();
     const rapidocr = useRapidOCRStatus();
     const [cacheEntries, setCacheEntries] = useState<number | null>(null);
 
@@ -691,7 +704,9 @@ export const TabTranslation: VFC<TabTranslationProps> = ({ scrollTarget, onScrol
         return () => clearTimeout(timeoutId);
     }, [scrollTarget]);
 
-    const isCT2 = settings.translationProvider === 'ct2';
+    // Offline translators need a specific source language
+    const isCT2 = settings.translationProvider === 'ct2' || settings.translationProvider === 'quickmt';
+    const jaToEn = settings.inputLanguage === 'ja' && settings.targetLanguage === 'en';
     const filteredLanguageOptions = isCT2
         ? languageOptions.filter(lang => lang.data !== "auto")
         : languageOptions;
@@ -1077,6 +1092,9 @@ export const TabTranslation: VFC<TabTranslationProps> = ({ scrollTarget, onScrol
                                 <Dropdown
                                     rgOptions={[
                                         { label: <span>On-Device</span>, data: "ct2" },
+                                        // Japanese -> English only, so offered when those are picked
+                                        ...(jaToEn || settings.translationProvider === 'quickmt'
+                                            ? [{ label: <span>On-Device ja→en (fast)</span>, data: "quickmt" }] : []),
                                         { label: <span>Google Translate</span>, data: "freegoogle" },
                                         { label: <span>Google Cloud</span>, data: "googlecloud" }
                                     ]}
@@ -1114,6 +1132,9 @@ export const TabTranslation: VFC<TabTranslationProps> = ({ scrollTarget, onScrol
                             )}
                             {settings.translationProvider === 'ct2' && (
                                 <ModelActionButton state={nllb} actionRef={ct2ActionRef} />
+                            )}
+                            {settings.translationProvider === 'quickmt' && (
+                                <ModelActionButton state={qmt} actionRef={ct2ActionRef} />
                             )}
                         </Focusable>
                         )}
@@ -1160,6 +1181,29 @@ export const TabTranslation: VFC<TabTranslationProps> = ({ scrollTarget, onScrol
                                     <div>- Requires API key</div>
                                     {!settings.googleApiKey && (
                                         <div style={{ color: "#ff6b6b", marginTop: "4px" }}>You need to add your API Key</div>
+                                    )}
+                                </>
+                            )}
+                            {settings.ocrProvider !== 'gemini_vision' && settings.translationProvider === 'quickmt' && (
+                                <>
+                                    <div style={{ display: "inline-flex", flexDirection: "column" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                            <img src={steamdeckLogo} alt="" style={{ height: "18px" }} />
+                                            <span style={{ fontWeight: "bold", color: "#dcdedf" }}>On-Device (quickmt ja-en)</span>
+                                        </div>
+                                        <ModelHeadingProgressBar state={qmt} />
+                                    </div>
+                                    <ModelStatusIndicator state={qmt} />
+                                    <ModelDownloadError state={qmt} />
+                                    <ProviderRating quality={2} speed={3} />
+                                    <div>- Offline, private, no rate limits: a good match for Live subtitles</div>
+                                    <div>- Japanese to English only</div>
+                                    <div>- 400 MB one-time download; about 300 MB of memory while in use, freed after 10 minutes idle</div>
+                                    <div>- About as accurate as the 1.3B NLLB model on its benchmark, many times faster</div>
+                                    {!jaToEn && (
+                                        <div style={{ color: "#ffa726", marginTop: "6px" }}>
+                                            This model only translates Japanese to English. Set Input Language to Japanese and Output Language to English.
+                                        </div>
                                     )}
                                 </>
                             )}

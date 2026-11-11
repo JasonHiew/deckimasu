@@ -69,7 +69,12 @@ if [ "$DRY_RUN" = 1 ]; then
 fi
 
 echo "Looking for Deckimasu on $TARGET..."
-PLUGIN_DIR="$(ssh "${SSH_OPTS[@]}" "$TARGET" 'for f in ~/homebrew/plugins/*/plugin.json; do grep -q "\"Deckimasu\"" "$f" && dirname "$f"; done' | head -n 1)"
+PLUGIN_DIR="$(ssh "${SSH_OPTS[@]}" "$TARGET" 'for f in ~/homebrew/plugins/*/plugin.json; do grep -q "\"Deckimasu\"" "$f" && dirname "$f"; done' | head -n 1 || true)"
+if [ -z "$PLUGIN_DIR" ]; then
+    # Before 1.0 the fork installed as "Decky Translator"; update that copy
+    PLUGIN_DIR="$(ssh "${SSH_OPTS[@]}" "$TARGET" 'for f in ~/homebrew/plugins/*/plugin.json; do grep -q "\"Decky Translator\"" "$f" && dirname "$f"; done' | head -n 1 || true)"
+    [ -n "$PLUGIN_DIR" ] && echo "Deckimasu not installed yet; updating the older Decky Translator install instead."
+fi
 if [ -z "$PLUGIN_DIR" ]; then
     echo "Deckimasu is not installed on $HOST. Install it once from a release zip, then rerun this." >&2
     exit 1

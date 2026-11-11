@@ -96,9 +96,9 @@ export const TabMain: VFC<TabMainProps> = ({ logic, overlayVisible, providerStat
 
     const translationNeedsDownload =
         settings.ocrProvider !== 'gemini_vision'
-        && settings.translationProvider === 'ct2'
         && !!providerStatus
-        && !providerStatus.nllb_downloaded;
+        && ((settings.translationProvider === 'ct2' && !providerStatus.nllb_downloaded)
+            || (settings.translationProvider === 'quickmt' && !providerStatus.quickmt_downloaded));
 
     const handleButtonClick = () => {
         if (overlayVisible) {
@@ -162,7 +162,7 @@ export const TabMain: VFC<TabMainProps> = ({ logic, overlayVisible, providerStat
                         <ToggleField
                             label="Live subtitles"
                             description={"Translates the screen every few seconds while you play and shows it over the game. Heavy: about one CPU core, and the on-device OCR model (~0.4 GB) stays loaded. Open the overlay as usual to look words up."
-                                + (settings.translationProvider === 'ct2' ? "" : " Web translation can hit rate limits with this on; lines it can't translate are skipped and retried.")}
+                                + (settings.translationProvider === 'ct2' || settings.translationProvider === 'quickmt' ? "" : " Web translation can hit rate limits with this on; lines it can't translate are skipped and retried.")}
                             checked={settings.liveSubtitles}
                             onChange={(value) => updateSetting('liveSubtitles', value, 'Live subtitles')}
                         />
@@ -345,7 +345,8 @@ export const TabMain: VFC<TabMainProps> = ({ logic, overlayVisible, providerStat
                                         <span style={{ color: '#888' }}>Translation:</span>
                                         <span style={{ marginLeft: '6px', fontWeight: 'bold' }}>
                                             {settings.translationProvider === 'googlecloud' ? 'Google Cloud' :
-                                             settings.translationProvider === 'ct2' ? 'On-Device' : 'Google Translate'}
+                                             settings.translationProvider === 'ct2' ? 'On-Device' :
+                                             settings.translationProvider === 'quickmt' ? 'On-Device (ja→en)' : 'Google Translate'}
                                         </span>
                                     </div>
                                 )}
@@ -367,6 +368,29 @@ export const TabMain: VFC<TabMainProps> = ({ logic, overlayVisible, providerStat
                                     {settings.ocrProvider !== 'gemini_vision' && settings.translationProvider === 'googlecloud' && (
                                         <>
                                             <ReachabilityRow result={webReachability?.translation} expectedProvider="googlecloud" />
+                                        </>
+                                    )}
+                                    {settings.ocrProvider !== 'gemini_vision' && settings.translationProvider === 'quickmt' && (
+                                        <>
+                                            {providerStatus?.quickmt_downloaded && (
+                                                <div style={{ color: '#666', fontSize: '10px' }}>Model: quickmt ja-en</div>
+                                            )}
+                                            <div style={{ color: '#666', fontSize: '10px', display: 'flex', alignItems: 'center' }}>
+                                                {providerStatus?.quickmt_downloading ? (
+                                                    <>
+                                                        <InstallingDot />
+                                                        <span>Installing...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <StatusDot ok={!!providerStatus?.quickmt_downloaded
+                                                            && settings.inputLanguage === 'ja' && settings.targetLanguage === 'en'} />
+                                                        <span>{!providerStatus?.quickmt_downloaded ? 'Not ready (Model not installed)'
+                                                            : settings.inputLanguage === 'ja' && settings.targetLanguage === 'en' ? 'Ready'
+                                                            : 'Not ready (Japanese to English only)'}</span>
+                                                    </>
+                                                )}
+                                            </div>
                                         </>
                                     )}
                                     {settings.ocrProvider !== 'gemini_vision' && settings.translationProvider === 'ct2' && (

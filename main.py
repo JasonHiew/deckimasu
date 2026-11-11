@@ -1721,6 +1721,8 @@ class Plugin:
                         self._provider_manager.stop_ct2_worker()
                     elif plugin_enabled:
                         self._provider_manager.resume_ct2_worker()
+                    if value != "quickmt":
+                        self._provider_manager.stop_quickmt_worker()
             elif key == "translation_cache_enabled":
                 self._translation_cache_enabled = bool(value)
             elif key == "incognito":
@@ -2630,6 +2632,14 @@ class Plugin:
                         await self._cache_put(pairs, input_lang, target_lang, "gemini_vision")
                 return text_regions
 
+            # quickmt only does Japanese -> English
+            if self._translation_provider == "quickmt":
+                provider = self._provider_manager.get_translation_provider()
+                if provider and not provider.supports(input_lang, target_lang):
+                    return {"error": "model_not_available", "message": "The quickmt model only translates Japanese to English. Set Input Language to Japanese and Output Language to English, or pick another translator"}
+                if provider and not provider.is_available(input_lang, target_lang):
+                    return {"error": "model_not_available", "message": "quickmt model not found. Download it in the Translation tab"}
+
             # Check if CT2 provider has the needed models
             if self._translation_provider == "ct2":
                 provider = self._provider_manager.get_translation_provider()
@@ -3055,6 +3065,29 @@ class Plugin:
         except Exception as e:
             logger.error(f"Error getting hidraw status: {e}")
             return {"success": False, "error": str(e)}
+
+    # -- quickmt-ja-en model management API --
+
+    async def get_quickmt_status(self):
+        if not self._provider_manager:
+            return {"downloaded": False, "downloading": False, "progress": 0, "error": None}
+        return self._provider_manager.get_quickmt_status()
+
+    async def download_quickmt_model(self):
+        return bool(self._provider_manager and self._provider_manager.download_quickmt_model())
+
+    async def cancel_quickmt_download(self):
+        if self._provider_manager:
+            self._provider_manager.cancel_quickmt_download()
+        return True
+
+    async def clear_quickmt_model_error(self):
+        if self._provider_manager:
+            self._provider_manager.clear_quickmt_download_error()
+        return True
+
+    async def delete_quickmt_model(self):
+        return bool(self._provider_manager and self._provider_manager.delete_quickmt_model())
 
     # -- NLLB model management API --
 

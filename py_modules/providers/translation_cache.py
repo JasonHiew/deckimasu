@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 # A request reuses a cached entry only if its tier is >= the selected provider's tier, so quality only flows downward
 PROVIDER_TIERS = {
     "ct2": 1,
+    "quickmt": 1,
     "freegoogle": 2,
     "googlecloud": 3,
     "gemini_vision": 3,

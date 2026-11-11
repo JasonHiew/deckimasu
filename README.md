@@ -17,6 +17,7 @@ Decky Translator is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-
 - **Cached translations open in the dictionary.** Translation → View Cached Translations: tap an entry or press A to look up words in its original text.
 - **Furigana on the original text.** Show Original puts readings above the kanji, picked from the installed dictionaries (Dictionary → Learning Aids).
 - **Live subtitles (opt-in, heavy).** Translates the screen every few seconds while you play and draws the translations over the game, which keeps the controller. See [Memory and battery](#memory-and-battery).
+- **Fast offline Japanese → English** with [quickmt ja-en](https://huggingface.co/quickmt/quickmt-ja-en): no web service, so no rate limits, and quick enough for Live subtitles.
 - **Incognito mode.** Nothing about what you read is written to the Deck: new translations stay in memory, caption text stays out of the logs, and saving a bookmark asks twice.
 - **Full controller navigation** of the overlay and the dictionary, with the D-pad or either stick.
 - **One-step dictionary install:** JMdict, JMnedict, Jiten frequency and a bundled Kanjium pitch accent dictionary. Any other Yomitan dictionary can be added from a .zip.
@@ -149,6 +150,8 @@ The Deck's 16 GB is shared with the game and can't be upgraded, so it is worth k
 |------|--------|------|
 | On-device OCR (Chrome Screen AI) | about **400 MB** | Loaded at the first translation, freed after 10 minutes without one |
 | On-device OCR with **Live subtitles** on | about **400 MB**, all the time | Stays loaded while the toggle is on, and keeps about one CPU core busy |
+| On-device translation: quickmt ja-en | about **300 MB** | Loaded at the first translation, freed after 10 minutes without one |
+| On-device translation: NLLB-200 1.3B | well over 1 GB | Loaded while in use |
 | Dictionaries | a few MB | Database connections close after 3 minutes idle |
 | Web providers (Google Translate, OCR.space, Gemini) | none on the Deck | |
 
@@ -225,6 +228,7 @@ Decky Translator allows you to choose different Text Recognition and Translation
 
 | Provider                                                                                     | Type      | Description                                                                                                                          | Requirements                |
 |----------------------------------------------------------------------------------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
+| [**quickmt ja-en**](https://huggingface.co/quickmt/quickmt-ja-en) (this fork)                | On-device | **Japanese → English only.** A 200M-parameter CTranslate2 model: about as accurate as NLLB 1.3B on its benchmark, many times faster (ten caption boxes in ~0.3 s on the Deck), ~300 MB of memory while in use. No rate limits, so it suits Live subtitles. Shows up as "On-Device ja→en" once Japanese and English are picked | One-time 400 MB download    |
 | [**NLLB-200**](https://huggingface.co/facebook/nllb-200-distilled-1.3B)                      | On-device | Meta's NLLB-200 1.3B distilled model running locally via CTranslate2. Fully offline after download                                   | One-time 1.4 GB download    |
 | [**Gemini Vision**](https://ai.google.dev/gemini-api)                                        | Web       | When Gemini is selected as the OCR provider, it returns the translation in the same call — no separate translation provider needed   | Internet + API key          |
 | [**Google Translate**](https://translate.google.com/)                                        | Web       | It's Google. And it translates                                                                                                       | Internet                    |
@@ -369,6 +373,14 @@ On-device OCR alternative. Based on [PaddleOCR](https://github.com/PaddlePaddle/
 | greek_rec.onnx + greek_dict.txt | Greek recognition |
 | thai_rec.onnx + thai_dict.txt | Thai recognition |
 | ch_ppocr_mobile_v2.0_cls_infer.onnx | Text direction classifier |
+
+### quickmt ja-en Translation Model
+
+Used for fast offline Japanese → English translation. Downloaded on demand from Hugging Face, at a pinned revision.
+
+| Component | Source | License |
+|-----------|--------|---------|
+| quickmt ja-en (CTranslate2, 200M parameters) | [quickmt/quickmt-ja-en](https://huggingface.co/quickmt/quickmt-ja-en) | [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 
 ### NLLB-200 Translation Model
 

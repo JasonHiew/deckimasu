@@ -2,6 +2,7 @@
 # Provider factory and manager
 
 import hashlib
+import os
 import logging
 import time
 from typing import List, Optional
@@ -24,6 +25,7 @@ from .chromescreenai_provider import ChromeScreenAIProvider
 from .gemini_vision import GeminiVisionProvider
 from .ct2_translate import CT2TranslateProvider
 from .nllb_downloader import NLLBDownloader
+from .quickmt_provider import QuickMTDownloader, QuickMTProvider
 from .screenai_downloader import ScreenAIDownloader
 from .rapidocr_downloader import RapidOCRDownloader
 
@@ -124,6 +126,9 @@ class ProviderManager:
             self._ct2_models_dir = ct2_models_dir
             if not self._model_manager:
                 self._model_manager = NLLBDownloader(ct2_models_dir)
+            if not getattr(self, '_quickmt_downloader', None):
+                # Next to the NLLB folder: models/quickmt-ja-en
+                self._quickmt_downloader = QuickMTDownloader(os.path.dirname(os.path.normpath(ct2_models_dir)))
         if screenai_models_dir and not self._screenai_downloader:
             self._screenai_downloader = ScreenAIDownloader(screenai_models_dir)
         if rapidocr_models_dir and not self._rapidocr_downloader:
@@ -397,6 +402,8 @@ class ProviderManager:
                 provider_type = ProviderType.GOOGLE
             elif self._translation_provider_preference == "ct2":
                 provider_type = ProviderType.CT2
+            elif self._translation_provider_preference == "quickmt":
+                provider_type = ProviderType.QUICKMT
             else:
                 provider_type = ProviderType.FREE_GOOGLE
 
@@ -415,6 +422,9 @@ class ProviderManager:
                     if self._ct2_persistent_mode:
                         provider.set_persistent_mode(True)
                     self._translation_providers[provider_type] = provider
+            elif provider_type == ProviderType.QUICKMT:
+                if getattr(self, '_quickmt_downloader', None):
+                    self._translation_providers[provider_type] = QuickMTProvider(self._quickmt_downloader)
 
         return self._translation_providers.get(provider_type)
 
@@ -518,6 +528,10 @@ class ProviderManager:
         status["rapidocr_error"] = rapidocr.get_init_error()
 
         status["nllb_downloaded"] = self.is_nllb_model_downloaded()
+        qmt = self.get_quickmt_status()
+        status["quickmt_downloaded"] = qmt["downloaded"]
+        status["quickmt_downloading"] = qmt["downloading"]
+        status["quickmt_progress"] = float(qmt["progress"] or 0)
         status["chromescreenai_downloaded"] = self.is_chromescreenai_downloaded()
         status["rapidocr_downloaded"] = self.is_rapidocr_models_downloaded()
 
@@ -637,6 +651,42 @@ class ProviderManager:
         if self._model_manager:
             self._model_manager.clear_download_error()
 
+    # -- quickmt-ja-en model management --
+
+    def get_quickmt_status(self) -> dict:
+        dl = getattr(self, '_quickmt_downloader', None)
+        if not dl:
+            return {"downloaded": False, "size": 0, "approx_size_mb": 0, "downloading": False, "progress": 0, "error": None}
+        return dl.get_status()
+
+    def download_quickmt_model(self) -> bool:
+        dl = getattr(self, '_quickmt_downloader', None)
+        return dl.start_download() if dl else False
+
+    def cancel_quickmt_download(self) -> None:
+        dl = getattr(self, '_quickmt_downloader', None)
+        if dl:
+            dl.cancel_download()
+
+    def clear_quickmt_download_error(self) -> None:
+        dl = getattr(self, '_quickmt_downloader', None)
+        if dl:
+            dl.clear_error()
+
+    def delete_quickmt_model(self) -> bool:
+        dl = getattr(self, '_quickmt_downloader', None)
+        if not dl:
+            return False
+        provider = self._translation_providers.pop(ProviderType.QUICKMT, None)
+        if provider:
+            provider.shutdown()
+        return dl.delete_model()
+
+    def stop_quickmt_worker(self) -> None:
+        provider = self._translation_providers.get(ProviderType.QUICKMT)
+        if provider:
+            provider.shutdown()
+
     # -- Chrome Screen AI download management --
 
     def is_chromescreenai_downloaded(self) -> bool:
@@ -717,6 +767,7 @@ class ProviderManager:
         ct2 = self._translation_providers.get(ProviderType.CT2)
         if ct2 and hasattr(ct2, 'shutdown'):
             ct2.shutdown()
+        self.stop_quickmt_worker()
         rapidocr = self._ocr_providers.get(ProviderType.RAPIDOCR)
         if rapidocr and hasattr(rapidocr, 'stop_worker'):
             rapidocr.stop_worker()
